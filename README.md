@@ -33,3 +33,7 @@ Built-in stations live in `BuiltInStations` in `app/src/main/java/com/mradio/app
 ## Build
 
 Every push to `main` builds the APK with GitHub Actions and publishes it as a release named "MRadio <version>" (1.0, 1.1, 1.2 …, one decimal place) with release notes listing the changes since the previous release. To jump to a new number (e.g. 2.0), run the workflow by hand from the Actions tab and type the version. Locally: `./gradlew assembleRelease` (needs JDK 17 + Android SDK).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
