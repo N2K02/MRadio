@@ -2,12 +2,25 @@ package com.mradio.app
 
 import android.os.Bundle
 import androidx.media3.session.SessionCommand
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 /**
- * Next/previous station requests from the app's player bar to PlaybackService.
- * (The notification, lock screen and Android Auto use the standard next/previous buttons.)
+ * Requests from the app's player bar and the notification to PlaybackService.
+ * (Next/previous in the notification, lock screen and Android Auto use the standard buttons.)
  */
 object StationCommands {
     val NEXT = SessionCommand("com.mradio.app.NEXT_STATION", Bundle.EMPTY)
     val PREVIOUS = SessionCommand("com.mradio.app.PREVIOUS_STATION", Bundle.EMPTY)
+    val EXIT = SessionCommand("com.mradio.app.EXIT", Bundle.EMPTY)
+}
+
+/** Tells an open app screen to close when Exit is pressed in the notification. */
+object AppExit {
+    private val _requests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val requests: SharedFlow<Unit> = _requests
+
+    fun request() {
+        _requests.tryEmit(Unit)
+    }
 }

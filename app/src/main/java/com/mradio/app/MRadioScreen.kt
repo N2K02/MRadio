@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -140,7 +141,7 @@ private fun rememberPlayerUi(controller: MediaController?): PlayerUi {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MRadioScreen(controller: MediaController?) {
+fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val stations by Library.stations.collectAsState()
     val mine by Library.mine.collectAsState()
     val favourites by Library.favourites.collectAsState()
@@ -261,12 +262,20 @@ fun MRadioScreen(controller: MediaController?) {
             contentPadding = padding,
         ) {
             item {
-                Text(
-                    "MRadio",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 24.dp, end = 16.dp, top = 16.dp),
+                ) {
+                    Text(
+                        "MRadio",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilledTonalIconButton(onClick = onExit) {
+                        Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Exit")
+                    }
+                }
                 Text(
                     "Radio from all around Mauritius",
                     style = MaterialTheme.typography.bodyLarge,

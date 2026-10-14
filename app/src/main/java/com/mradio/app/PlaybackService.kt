@@ -18,6 +18,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
@@ -102,7 +103,37 @@ class PlaybackService : MediaLibraryService() {
         )
         session = MediaLibrarySession.Builder(this, StationSwitcher(player), LibraryCallback())
             .setSessionActivity(openApp)
+            .setMediaButtonPreferences(notificationButtons())
             .build()
+    }
+
+    /** Previous station, next station and Exit in the notification (names are read out by TalkBack). */
+    private fun notificationButtons(): List<CommandButton> = listOf(
+        CommandButton.Builder(CommandButton.ICON_PREVIOUS)
+            .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .setDisplayName("Previous station")
+            .setSlots(CommandButton.SLOT_BACK)
+            .build(),
+        CommandButton.Builder(CommandButton.ICON_NEXT)
+            .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
+            .setDisplayName("Next station")
+            .setSlots(CommandButton.SLOT_FORWARD)
+            .build(),
+        CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(R.drawable.ic_exit)
+            .setSessionCommand(StationCommands.EXIT)
+            .setDisplayName("Exit")
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build(),
+    )
+
+    /** Exit: stop the radio, remove the notification, close the app screen if it is open. */
+    private fun exitApp() {
+        current = null
+        player.stop()
+        player.clearMediaItems()
+        AppExit.request()
+        stopSelf()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
@@ -306,6 +337,7 @@ class PlaybackService : MediaLibraryService() {
                     base.availableSessionCommands.buildUpon()
                         .add(StationCommands.NEXT)
                         .add(StationCommands.PREVIOUS)
+                        .add(StationCommands.EXIT)
                         .build(),
                 )
                 .setAvailablePlayerCommands(base.availablePlayerCommands)
@@ -321,6 +353,7 @@ class PlaybackService : MediaLibraryService() {
             when (customCommand.customAction) {
                 StationCommands.NEXT.customAction -> switchStation(+1)
                 StationCommands.PREVIOUS.customAction -> switchStation(-1)
+                StationCommands.EXIT.customAction -> exitApp()
                 else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))

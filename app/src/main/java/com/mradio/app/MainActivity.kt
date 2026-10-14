@@ -7,9 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -20,11 +22,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Library.init(this)
+        // Exit pressed in the notification while the app is open.
+        lifecycleScope.launch { AppExit.requests.collect { finishAndRemoveTask() } }
         setContent {
             MRadioTheme {
-                MRadioScreen(controller = controller.value)
+                MRadioScreen(controller = controller.value, onExit = ::exit)
             }
         }
+    }
+
+    /** Stop the radio and close the app. */
+    private fun exit() {
+        controller.value?.sendCustomCommand(StationCommands.EXIT, Bundle.EMPTY)
+        finishAndRemoveTask()
     }
 
     override fun onStart() {
