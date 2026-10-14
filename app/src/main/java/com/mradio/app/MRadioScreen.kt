@@ -42,6 +42,8 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -215,7 +217,13 @@ fun MRadioScreen(controller: MediaController?) {
                 exit = slideOutVertically { it },
             ) {
                 current?.let { station ->
-                    NowPlayingBar(station = station, player = player, onPlayPause = { playOrPause(station) })
+                    NowPlayingBar(
+                        station = station,
+                        player = player,
+                        onPlayPause = { playOrPause(station) },
+                        onPrevious = { controller?.seekToPrevious() },
+                        onNext = { controller?.seekToNext() },
+                    )
                 }
             }
         },
@@ -519,7 +527,13 @@ private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun NowPlayingBar(station: Station, player: PlayerUi, onPlayPause: () -> Unit) {
+private fun NowPlayingBar(
+    station: Station,
+    player: PlayerUi,
+    onPlayPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
     val status = when {
         player.failed -> "Can't reach this station right now"
         player.buffering -> "Connecting…"
@@ -570,6 +584,9 @@ private fun NowPlayingBar(station: Station, player: PlayerUi, onPlayPause: () ->
                     )
                 }
             }
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous station")
+            }
             Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
                 if (player.buffering) {
                     LoadingIndicator(Modifier.size(48.dp))
@@ -581,6 +598,9 @@ private fun NowPlayingBar(station: Station, player: PlayerUi, onPlayPause: () ->
                         )
                     }
                 }
+            }
+            IconButton(onClick = onNext) {
+                Icon(Icons.Rounded.SkipNext, contentDescription = "Next station")
             }
         }
     }

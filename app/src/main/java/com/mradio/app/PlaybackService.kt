@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
@@ -96,7 +97,7 @@ class PlaybackService : MediaLibraryService() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaLibrarySession.Builder(this, player, LibraryCallback())
+        session = MediaLibrarySession.Builder(this, StationSwitcher(player), LibraryCallback())
             .setSessionActivity(openApp)
             .build()
     }
@@ -172,6 +173,40 @@ class PlaybackService : MediaLibraryService() {
             .apply { if (url.contains(".m3u8", ignoreCase = true)) setMimeType(MimeTypes.APPLICATION_M3U8) }
             .setMediaMetadata(metadata(station, artwork = true))
             .build()
+
+    // ---------------------------------------------------------------- next / previous station
+
+    /**
+     * Gives the notification, lock screen, Bluetooth and Android Auto "next" and "previous"
+     * buttons that switch station, in the same order as the app's list (favourites first).
+     */
+    private inner class StationSwitcher(player: Player) : ForwardingPlayer(player) {
+        override fun getAvailableCommands(): Player.Commands =
+            super.getAvailableCommands().buildUpon()
+                .add(Player.COMMAND_SEEK_TO_NEXT)
+                .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .build()
+
+        override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+        override fun hasNextMediaItem(): Boolean = true
+        override fun hasPreviousMediaItem(): Boolean = true
+        override fun seekToNext() = switchStation(+1)
+        override fun seekToNextMediaItem() = switchStation(+1)
+        override fun seekToPrevious() = switchStation(-1)
+        override fun seekToPreviousMediaItem() = switchStation(-1)
+    }
+
+    private fun switchStation(step: Int) {
+        val list = Library.favouritesFirst()
+        if (list.isEmpty()) return
+        val index = list.indexOfFirst { it.id == current?.id }
+        val next = if (index < 0) list.first() else list[Math.floorMod(index + step, list.size)]
+        player.setMediaItem(startStation(next))
+        player.prepare()
+        player.play()
+    }
 
     // ---------------------------------------------------------------- browse tree
 
