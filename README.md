@@ -2,7 +2,7 @@
 
 Live radio from all around Mauritius, on your phone and in the car with **Android Auto**.
 
-- **15 Mauritius stations built in**: Radio Plus (+ Hits, Fever, Indiz), Top FM, Radio One, MBC Radio Maurice, Kool FM, Best FM, Taal FM, Radio Mauritius, OUi Radio, Tamizen, Radio 7 and Sensuelle Radio.
+- **16 Mauritius stations built in**: Radio Plus (+ Hits, Fever, Indiz), Top FM, NRJ Maurice, Radio One, MBC Radio Maurice, Kool FM, Best FM, Taal FM, Radio Mauritius, OUi Radio, Tamizen, Radio 7 and Sensuelle Radio.
 - **Search** your stations, or find new ones in the free [Radio Browser](https://www.radio-browser.info/) directory (Mauritius or worldwide) and add them with one tap.
 - **More from Mauritius**: stations in the directory you haven't added yet are listed under your own.
 - **Favourites** at the top of the list (and in Android Auto).

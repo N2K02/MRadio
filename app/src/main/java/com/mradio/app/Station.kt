@@ -82,6 +82,7 @@ object BuiltInStations {
         Station("mu:radioplus-fever", "Radio Plus Fever", radioCo("s3fe39a4a4"), "dance, party", builtIn = true),
         Station("mu:radioplus-indiz", "Radio Plus Indiz", radioCo("sed5c5a375"), "bollywood, oriental", builtIn = true),
         Station("mu:topfm", "Top FM", listOf("https://s3.voscast.com:10153/stream"), "news, talk, hits", builtIn = true),
+        Station("mu:nrj", "NRJ Maurice", listOf("https://streaming.nrjaudio.fm/oudbea2h9r57"), "dance, pop, hits", builtIn = true),
         Station(
             "mu:radioone", "Radio One",
             listOf("https://centova57.instainternet.com/proxy/vivavoceltd?mp=/stream"),
