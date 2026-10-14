@@ -1,0 +1,92 @@
++ openssl version
+OpenSSL 3.0.13 30 Jan 2024 (Library: OpenSSL 3.0.13 30 Jan 2024)
+++ sort -V
+++ tail -1
+++ ls -d /usr/local/lib/android/sdk/build-tools/34.0.0 /usr/local/lib/android/sdk/build-tools/35.0.0 /usr/local/lib/android/sdk/build-tools/35.0.1 /usr/local/lib/android/sdk/build-tools/36.0.0 /usr/local/lib/android/sdk/build-tools/36.1.0 /usr/local/lib/android/sdk/build-tools/37.0.0
++ BT=/usr/local/lib/android/sdk/build-tools/37.0.0
++ echo 'build-tools: /usr/local/lib/android/sdk/build-tools/37.0.0'
+build-tools: /usr/local/lib/android/sdk/build-tools/37.0.0
++ /usr/local/lib/android/sdk/build-tools/37.0.0/apksigner version
+0.9
++ K=/home/runner/work/_temp/keys
++ mkdir -p /home/runner/work/_temp/keys/b
++ cp app/debug.keystore /home/runner/work/_temp/keys/b/old.keystore
+++ openssl rand -hex 24
++ export KP=651768d4490afd76c22a78a3ef17f22a7a390fd385cd4bf5
++ KP=651768d4490afd76c22a78a3ef17f22a7a390fd385cd4bf5
++ keytool -genkeypair -storetype PKCS12 -keystore /home/runner/work/_temp/keys/b/release.p12 -alias release -keyalg RSA -keysize 4096 -validity 11000 -storepass 651768d4490afd76c22a78a3ef17f22a7a390fd385cd4bf5 -keypass 651768d4490afd76c22a78a3ef17f22a7a390fd385cd4bf5 -dname CN=test
+Generating 4,096 bit RSA key pair and self-signed certificate (SHA384withRSA) with a validity of 11,000 days
+	for: CN=test
++ echo -n 651768d4490afd76c22a78a3ef17f22a7a390fd385cd4bf5
++ export SIGNING_PASSPHRASE=throwaway-test-passphrase
++ SIGNING_PASSPHRASE=throwaway-test-passphrase
++ tar -C /home/runner/work/_temp/keys/b -cf - release.p12 release.pass old.keystore
++ openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -pass env:SIGNING_PASSPHRASE -out /home/runner/work/_temp/keys.tar.enc
++ D=/home/runner/work/_temp/dec
++ mkdir -p /home/runner/work/_temp/dec
++ openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in /home/runner/work/_temp/keys.tar.enc -pass env:SIGNING_PASSPHRASE
++ tar -xf - -C /home/runner/work/_temp/dec
+++ cat /home/runner/work/_temp/dec/release.pass
++ export RP=651768d4490afd76c22a78a3ef17f22a7a390fd385cd4bf5
++ RP=651768d4490afd76c22a78a3ef17f22a7a390fd385cd4bf5
++ export OP=android
++ OP=android
+++ curl -sSL https://api.github.com/repos/N2K02/MRadio/releases/latest
+++ python3 -c 'import sys,json;print(json.load(sys.stdin)["assets"][0]["name"])'
++ curl -sSL -o in.apk https://github.com/N2K02/MRadio/releases/latest/download/MRadio-1.9.apk
++ ls -la in.apk
+-rw-r--r-- 1 runner runner 2556428 Oct 14 09:19 in.apk
++ /usr/local/lib/android/sdk/build-tools/37.0.0/apksigner rotate --out /home/runner/work/_temp/dec/lineage --old-signer --ks /home/runner/work/_temp/dec/old.keystore --ks-pass env:OP --ks-key-alias androiddebugkey --key-pass env:OP --new-signer --ks /home/runner/work/_temp/dec/release.p12 --ks-pass env:RP --ks-key-alias release --key-pass env:RP
++ /usr/local/lib/android/sdk/build-tools/37.0.0/apksigner sign --ks /home/runner/work/_temp/dec/old.keystore --ks-pass env:OP --ks-key-alias androiddebugkey --key-pass env:OP --next-signer --ks /home/runner/work/_temp/dec/release.p12 --ks-pass env:RP --ks-key-alias release --key-pass env:RP --lineage /home/runner/work/_temp/dec/lineage --rotation-min-sdk-version 28 --out out.apk in.apk
++ /usr/local/lib/android/sdk/build-tools/37.0.0/apksigner verify --verbose --print-certs out.apk
++ head -40
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V3.0 Signer: certificate DN: CN=test
+V3.0 Signer: certificate SHA-256 digest: 25b02e2a986e0a9b73c06c86396e9c07c41d9087cd89e4de1329e3c37e16b5e5
+V3.0 Signer: certificate SHA-1 digest: abe426751df291032ea3c074ca448bdacd1b5f52
+V3.0 Signer: certificate MD5 digest: 8369101408db967c565323db33ec8b0f
+V3.0 Signer: key algorithm: RSA
+V3.0 Signer: key size (bits): 4096
+V3.0 Signer: public key SHA-256 digest: ca1da275a2c3679f9349efabd323e4ce1627ca7aefc463056b8d76254248c1f8
+V3.0 Signer: public key SHA-1 digest: a2c09b55c66b18ae96401e15d46d158695aeebe5
+V3.0 Signer: public key MD5 digest: 4d58d17ac4b332f9900446157284ed52
++ /usr/local/lib/android/sdk/build-tools/37.0.0/apksigner lineage --in out.apk --print-certs -v
++ head -30
+Signer #1 in lineage certificate DN: CN=NetSpeed Debug, O=NetSpeed, C=US
+Signer #1 in lineage certificate SHA-256 digest: fa0758d6bccddacd0924ad176336cc35f70c35e39779c6a550b09c6967cc3b37
+Signer #1 in lineage certificate SHA-1 digest: d8c037e8818c54858dceff32ae3420f4cdefd129
+Signer #1 in lineage certificate MD5 digest: c4bdc672b05394e86523244b44589f1b
+Signer #1 in lineage key algorithm: RSA
+Signer #1 in lineage key size (bits): 2048
+Signer #1 in lineage public key SHA-256 digest: b1e4662e40e423dc266826971e0d2c5510ea75f78cc3ceedfe1c7977b9741fa5
+Signer #1 in lineage public key SHA-1 digest: dd29a3f2f3a4653f6be26c526a374db153d09c0c
+Signer #1 in lineage public key MD5 digest: 6a147b584107d424bcebaad0d5c6782e
+Has installed data capability: true
+Has shared UID capability    : true
+Has permission capability    : true
+Has rollback capability      : false
+Has auth capability          : true
+Signer #2 in lineage certificate DN: CN=test
+Signer #2 in lineage certificate SHA-256 digest: 25b02e2a986e0a9b73c06c86396e9c07c41d9087cd89e4de1329e3c37e16b5e5
+Signer #2 in lineage certificate SHA-1 digest: abe426751df291032ea3c074ca448bdacd1b5f52
+Signer #2 in lineage certificate MD5 digest: 8369101408db967c565323db33ec8b0f
+Signer #2 in lineage key algorithm: RSA
+Signer #2 in lineage key size (bits): 4096
+Signer #2 in lineage public key SHA-256 digest: ca1da275a2c3679f9349efabd323e4ce1627ca7aefc463056b8d76254248c1f8
+Signer #2 in lineage public key SHA-1 digest: a2c09b55c66b18ae96401e15d46d158695aeebe5
+Signer #2 in lineage public key MD5 digest: 4d58d17ac4b332f9900446157284ed52
+Has installed data capability: true
+Has shared UID capability    : true
+Has permission capability    : true
+Has rollback capability      : false
+Has auth capability          : true
++ echo RESULT=OK
+RESULT=OK
