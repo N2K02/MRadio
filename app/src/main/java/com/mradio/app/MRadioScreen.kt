@@ -12,6 +12,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.RemoveCircleOutline
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,6 +141,7 @@ private fun rememberPlayerUi(controller: MediaController?): PlayerUi {
 @Composable
 fun MRadioScreen(controller: MediaController?) {
     val stations by Library.stations.collectAsState()
+    val mine by Library.mine.collectAsState()
     val favourites by Library.favourites.collectAsState()
     val player = rememberPlayerUi(controller)
     val snackbar = remember { SnackbarHostState() }
@@ -145,16 +150,15 @@ fun MRadioScreen(controller: MediaController?) {
 
     var query by rememberSaveable { mutableStateOf("") }
     var worldwide by rememberSaveable { mutableStateOf(false) }
-    var removing by remember { mutableStateOf<Station?>(null) }
 
-    // "More from Mauritius": stations in the Radio Browser directory that aren't in the list yet.
+    // Mauritius stations from the Radio Browser directory, for More from Mauritius.
     var discovered by remember { mutableStateOf<List<Station>?>(null) }
     var discoverFailed by remember { mutableStateOf(false) }
     var discoverKey by remember { mutableIntStateOf(0) }
     LaunchedEffect(discoverKey) {
         discoverFailed = false
         runCatching { RadioBrowser.mauritius() }
-            .onSuccess { discovered = it; Library.remember(it) }
+            .onSuccess { discovered = it; Library.setDiscovered(it) }
             .onFailure { discoverFailed = true }
     }
 
@@ -174,6 +178,11 @@ fun MRadioScreen(controller: MediaController?) {
         searching = false
     }
 
+    val myList = remember(stations, mine, favourites) { Library.myStations() }
+    val moreList = remember(stations, mine, discovered) { Library.moreStations(discovered.orEmpty()) }
+    val localResults = remember(query, stations, mine) { Library.searchLocal(query) }
+    val onlineResults = remember(online, stations) { online?.filterNot { Library.known(it) } }
+
     val current = player.mediaId?.let { id -> Library.find(id) }
 
     fun playOrPause(station: Station) {
@@ -188,23 +197,41 @@ fun MRadioScreen(controller: MediaController?) {
         }
     }
 
-    fun add(station: Station) {
-        Library.add(station)
-        scope.launch { snackbar.showSnackbar("${station.name} added to your stations") }
+    fun announce(text: String, undo: () -> Unit) {
+        snackbar.currentSnackbarData?.dismiss()
+        scope.launch {
+            val result = snackbar.showSnackbar(text, actionLabel = "Undo", duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) undo()
+        }
+    }
+
+    fun moveToMine(station: Station) {
+        val id = Library.addToMine(station)
+        announce("${station.name} added to Favourite Radios") { Library.removeFromMine(id) }
+    }
+
+    fun moveToMore(station: Station) {
+        val wasHearted = station.id in favourites
+        Library.removeFromMine(station.id)
+        announce("${station.name} moved to More from Mauritius") {
+            if (wasHearted) Library.toggleFavourite(station) else Library.addToMine(station)
+        }
     }
 
     @Composable
-    fun StationItem(station: Station, inLibrary: Boolean) {
+    fun StationItem(station: Station, modifier: Modifier) {
+        val isMine = station.id in mine
         StationRow(
             station = station,
             isCurrent = player.mediaId == station.id,
             isPlaying = player.mediaId == station.id && player.isPlaying,
             isFavourite = station.id in favourites,
-            inLibrary = inLibrary,
+            isMine = isMine,
+            fromDirectory = !Library.known(station),
             onClick = { focus.clearFocus(); playOrPause(station) },
-            onLongClick = if (inLibrary && !station.builtIn) ({ removing = station }) else null,
-            onFavourite = { Library.toggleFavourite(station.id) },
-            onAdd = { add(station) },
+            onFavourite = { Library.toggleFavourite(station) },
+            onMove = { if (isMine) moveToMore(station) else moveToMine(station) },
+            modifier = modifier,
         )
     }
 
@@ -251,7 +278,7 @@ fun MRadioScreen(controller: MediaController?) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    placeholder = { Text("Search your stations or find new ones") },
+                    placeholder = { Text("Search stations or find new ones") },
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
@@ -274,22 +301,16 @@ fun MRadioScreen(controller: MediaController?) {
             }
 
             if (query.isBlank()) {
-                val favs = stations.filter { it.id in favourites }
-                if (favs.isNotEmpty()) {
-                    header("Favourites")
-                    items(favs, key = { "fav-" + it.id }) { StationItem(it, inLibrary = true) }
-                }
-                header("Your stations")
-                items(stations.filter { it.id !in favourites }, key = { "lib-" + it.id }) { StationItem(it, inLibrary = true) }
+                header("Favourite Radios")
+                if (myList.isEmpty()) message("Tap + on any station below to add it here.")
+                items(myList, key = { "mine-" + it.id }) { StationItem(it, Modifier.animateItem()) }
 
                 header("More from Mauritius")
-                val fresh = discovered?.filterNot { s -> stations.any { normalizeName(it.name) == normalizeName(s.name) || it.id == s.id } }
+                items(moreList, key = { "more-" + it.id }) { StationItem(it, Modifier.animateItem()) }
                 when {
-                    fresh != null && fresh.isNotEmpty() ->
-                        items(fresh, key = { "new-" + it.id }) { StationItem(it, inLibrary = false) }
-                    fresh != null -> message("You already have every Mauritius station in the directory.")
+                    discovered != null -> Unit
                     discoverFailed -> item {
-                        RetryMessage("Couldn't reach the station directory.") { discoverKey++ }
+                        RetryMessage("Couldn't reach the station directory for more stations.") { discoverKey++ }
                     }
                     else -> loading()
                 }
@@ -313,17 +334,15 @@ fun MRadioScreen(controller: MediaController?) {
                         )
                     }
                 }
-                val local = Library.searchLocal(query)
-                if (local.isNotEmpty()) {
-                    header("Your stations")
-                    items(local, key = { "q-lib-" + it.id }) { StationItem(it, inLibrary = true) }
+                if (localResults.isNotEmpty()) {
+                    header("Stations")
+                    items(localResults, key = { "q-" + it.id }) { StationItem(it, Modifier.animateItem()) }
                 }
                 header("Online")
-                val results = online?.filterNot { s -> stations.any { normalizeName(it.name) == normalizeName(s.name) || it.id == s.id } }
                 when {
-                    results != null && results.isNotEmpty() ->
-                        items(results, key = { "q-new-" + it.id }) { StationItem(it, inLibrary = false) }
-                    results != null -> message(
+                    onlineResults != null && onlineResults.isNotEmpty() ->
+                        items(onlineResults, key = { "q-new-" + it.id }) { StationItem(it, Modifier.animateItem()) }
+                    onlineResults != null -> message(
                         if (worldwide) "No other stations found." else "No other Mauritius stations found. Try Worldwide.",
                     )
                     searchFailed -> message("Couldn't reach the station directory. Check your connection.")
@@ -332,18 +351,6 @@ fun MRadioScreen(controller: MediaController?) {
             }
             item { Spacer(Modifier.size(24.dp)) }
         }
-    }
-
-    removing?.let { station ->
-        AlertDialog(
-            onDismissRequest = { removing = null },
-            title = { Text("Remove ${station.name}?") },
-            text = { Text("You can find it again with search.") },
-            confirmButton = {
-                TextButton(onClick = { Library.remove(station.id); removing = null }) { Text("Remove") }
-            },
-            dismissButton = { TextButton(onClick = { removing = null }) { Text("Cancel") } },
-        )
     }
 }
 
@@ -393,18 +400,22 @@ private fun RetryMessage(text: String, onRetry: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * A station: tap to play. On the right, the heart (top favourite) and the button that moves it
+ * between Favourite Radios (+) and More from Mauritius (−).
+ */
 @Composable
 private fun StationRow(
     station: Station,
     isCurrent: Boolean,
     isPlaying: Boolean,
     isFavourite: Boolean,
-    inLibrary: Boolean,
+    isMine: Boolean,
+    fromDirectory: Boolean,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)?,
     onFavourite: () -> Unit,
-    onAdd: () -> Unit,
+    onMove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     ListItem(
         headlineContent = {
@@ -413,34 +424,43 @@ private fun StationRow(
         supportingContent = {
             val streams = station.streams.size
             Text(
-                if (inLibrary) station.subtitle else "${station.subtitle} · $streams ${if (streams == 1) "stream" else "streams"}",
+                if (fromDirectory) "${station.subtitle} · $streams ${if (streams == 1) "stream" else "streams"}" else station.subtitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         },
         leadingContent = { StationBadge(station, spinning = isPlaying) },
         trailingContent = {
-            if (inLibrary) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 IconToggleButton(checked = isFavourite, onCheckedChange = { onFavourite() }) {
                     Icon(
                         if (isFavourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = if (isFavourite) "Remove from favourites" else "Add to favourites",
+                        contentDescription = if (isFavourite) "Remove heart" else "Heart",
                         tint = if (isFavourite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            } else {
-                FilledTonalIconButton(onClick = onAdd) {
-                    Icon(Icons.Rounded.Add, contentDescription = "Add to your stations")
+                if (isMine) {
+                    IconButton(onClick = onMove) {
+                        Icon(
+                            Icons.Rounded.RemoveCircleOutline,
+                            contentDescription = "Move to More from Mauritius",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    FilledTonalIconButton(onClick = onMove) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Add to Favourite Radios")
+                    }
                 }
             }
         },
         colors = ListItemDefaults.colors(
             containerColor = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         ),
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = 12.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(24.dp))
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .clickable(onClick = onClick),
     )
 }
 

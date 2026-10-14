@@ -21,6 +21,9 @@ object RadioBrowser {
         "fi1.api.radio-browser.info",
     )
 
+    /** Directory entries never shown in the app (normalized names). */
+    private val hidden = setOf("abdulbasitabdulsamad")
+
     @Volatile
     private var hosts: List<String>? = null
 
@@ -89,6 +92,7 @@ object RadioBrowser {
             val url = o.optString("url_resolved").ifBlank { o.optString("url") }.trim()
             val name = o.optString("name").trim()
             if (url.isEmpty() || name.isEmpty() || !url.startsWith("http")) return@mapNotNull null
+            if (hidden.any { normalizeName(name).contains(it) }) return@mapNotNull null
             val score = (if (o.optInt("lastcheckok") == 1) 1000 else 0) +
                 o.optInt("bitrate").coerceIn(0, 320) +
                 (if (url.startsWith("https")) 40 else 0)

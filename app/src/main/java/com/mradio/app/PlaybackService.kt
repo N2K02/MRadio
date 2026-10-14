@@ -178,7 +178,7 @@ class PlaybackService : MediaLibraryService() {
 
     /**
      * Gives the notification, lock screen, Bluetooth and Android Auto "next" and "previous"
-     * buttons that switch station, in the same order as the app's list (favourites first).
+     * buttons that switch station, within the section the station is in (Favourite Radios or More from Mauritius).
      */
     private inner class StationSwitcher(player: Player) : ForwardingPlayer(player) {
         override fun getAvailableCommands(): Player.Commands =
@@ -199,7 +199,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun switchStation(step: Int) {
-        val list = Library.favouritesFirst()
+        val list = Library.playOrder(current?.id)
         if (list.isEmpty()) return
         val index = list.indexOfFirst { it.id == current?.id }
         val next = if (index < 0) list.first() else list[Math.floorMod(index + step, list.size)]
@@ -245,8 +245,7 @@ class PlaybackService : MediaLibraryService() {
         .build()
 
     private fun folders() = listOf(
-        folder(FAVOURITES, "Favourites"),
-        folder(ALL, "All stations"),
+        folder(MINE, "Favourite Radios"),
         folder(DISCOVER, "More from Mauritius"),
     )
 
@@ -262,7 +261,7 @@ class PlaybackService : MediaLibraryService() {
     private suspend fun searchStations(query: String): List<Station> {
         val local = Library.searchLocal(query)
         val online = runCatching { RadioBrowser.search(query, mauritiusOnly = true) }
-            .getOrDefault(emptyList()).filterNot { Library.contains(it) }
+            .getOrDefault(emptyList()).filterNot { Library.known(it) }
         val world = if (local.isEmpty() && online.isEmpty()) {
             runCatching { RadioBrowser.search(query, mauritiusOnly = false) }.getOrDefault(emptyList())
         } else {
@@ -318,19 +317,13 @@ class PlaybackService : MediaLibraryService() {
             fun result(items: List<MediaItem>) = LibraryResult.ofItemList(pageOf(items, page, pageSize), params)
             return when (parentId) {
                 ROOT -> Futures.immediateFuture(result(folders()))
-                FAVOURITES -> {
-                    val favs = Library.favourites.value
-                    val items = Library.stations.value.filter { it.id in favs }.map { browseItem(it, artwork = true) }
-                    Futures.immediateFuture(result(items))
-                }
-                ALL -> Futures.immediateFuture(
-                    result(Library.favouritesFirst().map { browseItem(it, artwork = true) }),
+                MINE -> Futures.immediateFuture(
+                    result(Library.myStations().map { browseItem(it, artwork = true) }),
                 )
                 DISCOVER -> future {
-                    val found = runCatching { RadioBrowser.mauritius() }.getOrDefault(emptyList())
-                        .filterNot { Library.contains(it) }
-                    Library.remember(found)
-                    result(found.map { browseItem(it, artwork = false) })
+                    runCatching { RadioBrowser.mauritius() }.onSuccess { Library.setDiscovered(it) }
+                    val known = Library.stations.value.map { it.id }.toSet()
+                    result(Library.moreStations().map { browseItem(it, artwork = it.id in known) })
                 }
                 else -> Futures.immediateFuture(
                     LibraryResult.ofError<ImmutableList<MediaItem>>(LibraryResult.RESULT_ERROR_BAD_VALUE),
@@ -397,7 +390,7 @@ class PlaybackService : MediaLibraryService() {
                     // Voice: "Play Top FM on MRadio". An empty query means "play something".
                     val query = request.requestMetadata.searchQuery.orEmpty()
                     if (query.isBlank()) {
-                        Library.lastPlayed?.let { resolve(it) } ?: Library.favouritesFirst().firstOrNull()
+                        Library.lastPlayed?.let { resolve(it) } ?: Library.myStations().firstOrNull()
                     } else {
                         searchStations(query).firstOrNull()
                     }
@@ -411,15 +404,15 @@ class PlaybackService : MediaLibraryService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = future {
-            val station = Library.lastPlayed?.let { resolve(it) } ?: Library.favouritesFirst().first()
+            val station = Library.lastPlayed?.let { resolve(it) }
+                ?: Library.myStations().firstOrNull() ?: Library.stations.value.first()
             MediaSession.MediaItemsWithStartPosition(listOf(startStation(station)), 0, C.TIME_UNSET)
         }
     }
 
     private companion object {
         const val ROOT = "root"
-        const val FAVOURITES = "favourites"
-        const val ALL = "all"
+        const val MINE = "mine"
         const val DISCOVER = "discover"
 
         // Android Auto layout hints

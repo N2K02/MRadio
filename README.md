@@ -3,11 +3,12 @@
 Live radio from all around Mauritius, on your phone and in the car with **Android Auto**.
 
 - **16 Mauritius stations built in**: Radio Plus (+ Hits, Fever, Indiz), Top FM, NRJ Maurice, Radio One, MBC Radio Maurice, Kool FM, Best FM, Taal FM, Radio Mauritius, OUi Radio, Tamizen, Radio 7 and Sensuelle Radio.
-- **Search** your stations, or find new ones in the free [Radio Browser](https://www.radio-browser.info/) directory (Mauritius or worldwide) and add them with one tap.
-- **More from Mauritius**: stations in the directory you haven't added yet are listed under your own.
-- **Favourites** at the top of the list (and in Android Auto).
+- **Favourite Radios**: your own list, starting with the 3 most popular (Radio Plus, Top FM, Radio One). Tap **−** to move a station to More from Mauritius.
+- **More from Mauritius**: every other station, built-in and from the free [Radio Browser](https://www.radio-browser.info/) directory. Tap **+** to add one to Favourite Radios.
+- **Hearts** keep your top stations at the top of Favourite Radios; hearting a station also adds it there.
+- **Search** all stations, or find new ones in the directory (Mauritius or worldwide).
 - **Fallback streams**: each station has several stream links, best first. If one fails, the next is tried automatically. If they all fail, MRadio looks up backup links for that station online. The link that worked is remembered and tried first next time.
-- **Android Auto**: Favourites, All stations and More from Mauritius folders, search, voice ("Play Top FM on MRadio"), and resume of the last station.
+- **Android Auto**: Favourite Radios and More from Mauritius folders, search, voice ("Play Top FM on MRadio"), and resume of the last station.
 - Plays in the background with the usual media notification, lock-screen and Bluetooth controls; shows the song title when the station sends it.
 - Material 3 Expressive (same theme as NetSpeed, VGS and PixelCast): your wallpaper colours, follows the phone's light/dark mode.
 
