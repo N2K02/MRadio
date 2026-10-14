@@ -187,6 +187,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Library.place = p
     }
 
+    // Long lists show a page at a time, with "Show more" at the end.
+    var moreShown by remember(place) { mutableIntStateOf(PAGE) }
+    var onlineShown by remember(query, place) { mutableIntStateOf(PAGE) }
+
     // "More from …": popular stations in the chosen place, from every directory, merged.
     var discovered by remember(place) { mutableStateOf<List<Station>?>(null) }
     var discoverFailed by remember { mutableStateOf(false) }
@@ -321,6 +325,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
+              Column {
                 AnimatedVisibility(
                     visible = current != null && !playerOpen,
                     enter = slideInVertically { it },
@@ -339,6 +344,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         )
                     }
                 }
+                UpdateFooterBar("MRadio")
+              }
             },
         ) { padding ->
             LazyColumn(
@@ -405,7 +412,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
 
                     header(if (place == Directory.WORLDWIDE) "Popular worldwide" else "More from ${placeName(place)}")
-                    items(moreList, key = { "more-" + it.id }) { StationItem(it, false, moreList, Modifier.animateItem()) }
+                    items(moreList.take(moreShown), key = { "more-" + it.id }) { StationItem(it, false, moreList, Modifier.animateItem()) }
+                    showMore(shown = moreShown, total = moreList.size) { moreShown += PAGE }
                     when {
                         discovered != null -> if (moreList.isEmpty()) message("No other stations found here.")
                         discoverFailed -> item {
@@ -432,7 +440,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     }
                     header("Online · ${placeName(place)}")
                     val list = onlineResults.orEmpty()
-                    items(list, key = { "q-new-" + it.id }) { StationItem(it, false, list, Modifier.animateItem()) }
+                    items(list.take(onlineShown), key = { "q-new-" + it.id }) { StationItem(it, false, list, Modifier.animateItem()) }
+                    showMore(shown = onlineShown, total = list.size) { onlineShown += PAGE }
                     when {
                         searching && (online == null || list.isNotEmpty()) -> loading()
                         onlineResults != null && list.isEmpty() && !searching -> message(
@@ -443,7 +452,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         online == null -> loading()
                     }
                 }
-                item(key = "version") { UpdateFooter("MRadio", Modifier.padding(top = 16.dp)) }
                 item { Spacer(Modifier.size(24.dp)) }
             }
         }
@@ -665,6 +673,21 @@ private fun LazyListScope.header(text: String) = item(key = "h-$text") {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp),
     )
+}
+
+/** Stations shown per page in long lists. */
+private const val PAGE = 20
+
+/** "Show 20 more · 57 left" button at the end of a long list. */
+private fun LazyListScope.showMore(shown: Int, total: Int, onMore: () -> Unit) {
+    if (total <= shown) return
+    item(key = "more-button-$shown-$total") {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+            OutlinedButton(onClick = onMore, modifier = Modifier.fillMaxWidth()) {
+                Text("Show ${minOf(PAGE, total - shown)} more  ·  ${total - shown} left")
+            }
+        }
+    }
 }
 
 private fun LazyListScope.message(text: String) = item {
@@ -893,7 +916,6 @@ private fun NowPlayingBar(
         onClick = onOpen,
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(
