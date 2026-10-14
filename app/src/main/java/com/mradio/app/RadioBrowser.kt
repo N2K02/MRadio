@@ -38,17 +38,32 @@ object RadioBrowser {
         stations("/json/stations/byuuid/${URLEncoder.encode(uuid, "UTF-8")}").firstOrNull()
 
     /** Other streams for the same station, best first. Never throws. */
-    suspend fun alternates(station: Station): List<String> {
+    suspend fun alternates(station: Station): List<String> =
+        sameStation(station).flatMap { it.streams }.distinct()
+
+    /** A logo for the same station, if the directory has one. Never throws. */
+    suspend fun logo(station: Station): String? =
+        sameStation(station).firstNotNullOfOrNull { it.favicon }
+
+    /**
+     * Directory entries for the same station. Searches by the full name, then by the name
+     * without generic words ("Tamizen Radio" is listed as "Tamizen"). Never throws.
+     */
+    private suspend fun sameStation(station: Station): List<Station> {
         val key = normalizeName(station.name)
         if (key.length < 3) return emptyList()
         val mu = station.country.equals("MU", ignoreCase = true)
-        return runCatching { search(station.name, mauritiusOnly = mu) }.getOrDefault(emptyList())
-            .filter {
-                val k = normalizeName(it.name)
-                k.length >= 3 && (k == key || k.contains(key) || key.contains(k))
-            }
-            .flatMap { it.streams }
-            .distinct()
+        val generic = setOf("radio", "fm", "mauritius", "maurice", "mbc", "the")
+        val short = station.name.split(Regex("\\s+")).filter { it.lowercase() !in generic }.joinToString(" ")
+        for (query in listOf(station.name, short).filter { it.length >= 3 }.distinct()) {
+            val found = runCatching { search(query, mauritiusOnly = mu) }.getOrDefault(emptyList())
+                .filter {
+                    val k = normalizeName(it.name)
+                    k.length >= 3 && (k == key || k.contains(key) || key.contains(k))
+                }
+            if (found.isNotEmpty()) return found
+        }
+        return emptyList()
     }
 
     private suspend fun stations(path: String): List<Station> = parse(get(path))

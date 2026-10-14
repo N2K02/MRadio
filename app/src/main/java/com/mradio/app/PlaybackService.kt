@@ -184,7 +184,7 @@ class PlaybackService : MediaLibraryService() {
             .setIsPlayable(true)
             .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
             .apply {
-                val logo = station.favicon
+                val logo = Library.logo(station)
                 if (logo != null) {
                     setArtworkUri(Uri.parse(logo))
                 } else if (artwork) {

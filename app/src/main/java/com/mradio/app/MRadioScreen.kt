@@ -82,6 +82,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -90,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -434,10 +436,13 @@ private fun StationRow(
     )
 }
 
-/** Station initials on an expressive Material shape; the shape turns slowly while playing. */
+/**
+ * The station's logo on an expressive Material shape. The shape turns slowly behind the
+ * logo while the station plays. Without a logo (or while it loads) the initials show instead.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun StationBadge(station: Station, spinning: Boolean, size: Int = 48) {
+private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
     val shapes = listOf(
         MaterialShapes.Cookie9Sided,
         MaterialShapes.Clover4Leaf,
@@ -466,20 +471,49 @@ private fun StationBadge(station: Station, spinning: Boolean, size: Int = 48) {
         0f
     }
     val shape = shapes[index].toShape()
+
+    // Logo: the station's own, one found earlier, or look one up once for stations in the list.
+    var logo by remember(station.id) { mutableStateOf(Library.logo(station)) }
+    LaunchedEffect(station.id) {
+        if (logo == null && Library.shouldLookUpLogo(station)) {
+            RadioBrowser.logo(station)?.let {
+                Library.saveLogo(station.id, it)
+                logo = it
+            }
+        }
+    }
+    var loaded by remember(logo) { mutableStateOf(false) }
+
     Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { rotationZ = rotation }
                 .clip(shape)
-                .background(bg),
+                .background(if (spinning) scheme.primary else bg),
         )
-        Text(
-            initials(station.name),
-            color = if (spinning) scheme.primary else fg,
-            style = if (size >= 48) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-        )
+        if (!loaded) {
+            Text(
+                initials(station.name),
+                color = if (spinning) scheme.onPrimary else fg,
+                style = if (size >= 48) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        logo?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                onSuccess = { loaded = true },
+                onError = { loaded = false },
+                modifier = Modifier
+                    .size((size * 0.7f).dp)
+                    .clip(CircleShape)
+                    .background(if (loaded) Color.White else Color.Transparent)
+                    .padding(if (loaded) 3.dp else 0.dp),
+            )
+        }
     }
 }
 

@@ -107,6 +107,19 @@ object Library {
         }
     }
 
+    /** The station's logo: its own, or one found on Radio Browser earlier (see Logos). */
+    fun logo(station: Station): String? = station.favicon ?: prefs.getString("logo:${station.id}", null)
+
+    private val logoLookups = ConcurrentHashMap.newKeySet<String>()
+
+    /** Look up a missing logo at most once per app run, and only for stations in the list. */
+    fun shouldLookUpLogo(station: Station): Boolean =
+        _stations.value.any { it.id == station.id } && logoLookups.add(station.id)
+
+    fun saveLogo(stationId: String, url: String) {
+        prefs.edit().putString("logo:$stationId", url).apply()
+    }
+
     var lastPlayed: String?
         get() = prefs.getString("lastPlayed", null)
         set(value) = prefs.edit().putString("lastPlayed", value).apply()
