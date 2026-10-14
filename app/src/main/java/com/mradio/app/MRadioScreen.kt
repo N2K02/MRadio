@@ -1,5 +1,6 @@
 package com.mradio.app
 
+import android.os.Bundle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -248,8 +249,8 @@ fun MRadioScreen(controller: MediaController?) {
                         station = station,
                         player = player,
                         onPlayPause = { playOrPause(station) },
-                        onPrevious = { controller?.seekToPrevious() },
-                        onNext = { controller?.seekToNext() },
+                        onPrevious = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
+                        onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
                     )
                 }
             }
