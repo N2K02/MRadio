@@ -3,6 +3,9 @@ name: Build APK
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '.github/workflows/signing-test.yml'
+      - '.github/signing-test-result.txt'
   workflow_dispatch:
     inputs:
       version:
