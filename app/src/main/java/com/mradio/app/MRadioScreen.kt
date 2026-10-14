@@ -397,6 +397,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         onPickCountry = { pickCountry = true },
                     )
                 }
+                item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
 
                 if (query.isBlank()) {
                     header("Favourite Radios")
@@ -442,6 +443,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         online == null -> loading()
                     }
                 }
+                item(key = "version") { UpdateFooter("MRadio", Modifier.padding(top = 16.dp)) }
                 item { Spacer(Modifier.size(24.dp)) }
             }
         }

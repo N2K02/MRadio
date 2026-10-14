@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppUpdater.init(this, "N2K02/MRadio", "MRadio")
         enableEdgeToEdge()
         Library.init(this)
         // Exit pressed in the notification while the app is open.
@@ -35,6 +36,11 @@ class MainActivity : ComponentActivity() {
     private fun exit() {
         controller.value?.sendCustomCommand(StationCommands.EXIT, Bundle.EMPTY)
         finishAndRemoveTask()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        AppUpdater.onResume(this)
     }
 
     override fun onStart() {
