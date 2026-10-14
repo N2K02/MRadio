@@ -13,6 +13,11 @@ object StationCommands {
     val NEXT = SessionCommand("com.mradio.app.NEXT_STATION", Bundle.EMPTY)
     val PREVIOUS = SessionCommand("com.mradio.app.PREVIOUS_STATION", Bundle.EMPTY)
     val EXIT = SessionCommand("com.mradio.app.EXIT", Bundle.EMPTY)
+    /** Adds the playing station to Favourite Radios (the heart in the notification). */
+    val FAVOURITE = SessionCommand("com.mradio.app.FAVOURITE", Bundle.EMPTY)
+    /** Sleep timer; args: [MINUTES] (0 cancels). */
+    val SLEEP = SessionCommand("com.mradio.app.SLEEP", Bundle.EMPTY)
+    const val MINUTES = "minutes"
 }
 
 /** Tells an open app screen to close when Exit is pressed in the notification. */

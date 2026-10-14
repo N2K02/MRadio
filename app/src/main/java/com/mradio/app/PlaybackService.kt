@@ -1,7 +1,10 @@
 package com.mradio.app
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import androidx.annotation.OptIn
@@ -13,6 +16,8 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.extractor.metadata.icy.IcyHeaders
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -33,18 +38,22 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Plays the radio and serves the station browser for Android Auto, Bluetooth and the
  * media notification.
  *
  * Fallback: each station has an ordered list of streams. When one fails, the next is tried.
- * When all have failed, backup streams for the same station are looked up on Radio Browser.
- * The stream that plays is remembered and tried first next time.
+ * When all have failed, backup streams for the same station are looked up on Radio Browser and
+ * Streema. The stream that plays is remembered and tried first next time. If nothing plays,
+ * the station is marked as not working (the app shows an info icon for it).
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
@@ -60,6 +69,7 @@ class PlaybackService : MediaLibraryService() {
     private var attempt = 0
     private var lookedUpOnline = false
     private var wasPlaying = false
+    private var sleepJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -93,8 +103,11 @@ class PlaybackService : MediaLibraryService() {
                     val station = current ?: return
                     queue.getOrNull(attempt)?.let { Library.markGood(station.id, it) }
                     wasPlaying = true
+                    updateAudioInfo()
                 }
             }
+
+            override fun onTracksChanged(tracks: Tracks) = updateAudioInfo()
         })
 
         val openApp = PendingIntent.getActivity(
@@ -105,10 +118,72 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(notificationButtons())
             .build()
+
+        // The notification's heart shows only while the station isn't in Favourite Radios.
+        scope.launch { Library.mine.collect { refreshButtons() } }
     }
 
-    /** Previous station, next station and Exit in the notification (names are read out by TalkBack). */
-    private fun notificationButtons(): List<CommandButton> = listOf(
+    private fun refreshButtons() {
+        if (::session.isInitialized) session.setMediaButtonPreferences(notificationButtons())
+    }
+
+    /** What the stream says about itself: codec, bitrate, sample rate (for the player screen). */
+    private fun updateAudioInfo() {
+        val f = player.audioFormat
+        val url = queue.getOrNull(attempt)
+        if (f == null && url == null) return
+        var icy: IcyHeaders? = null
+        f?.metadata?.let { m -> for (i in 0 until m.length()) (m.get(i) as? IcyHeaders)?.let { icy = it } }
+        val mime = f?.sampleMimeType ?: f?.codecs
+        val codec = when {
+            mime == null -> null
+            mime.contains("mpeg", true) && !mime.contains("mp4", true) -> "MP3"
+            mime.contains("aac", true) || mime.contains("mp4a", true) -> "AAC"
+            mime.contains("opus", true) -> "Opus"
+            mime.contains("vorbis", true) -> "Ogg Vorbis"
+            mime.contains("flac", true) -> "FLAC"
+            else -> mime.substringAfter('/').uppercase()
+        }
+        val bits = listOf(icy?.bitrate ?: -1, f?.averageBitrate ?: -1, f?.bitrate ?: -1, f?.peakBitrate ?: -1)
+            .firstOrNull { it > 0 }
+        Library.audio.value = AudioInfo(
+            codec = codec,
+            bitrateKbps = bits?.let { it / 1000 },
+            sampleRateHz = f?.sampleRate?.takeIf { it > 0 },
+            channels = f?.channelCount?.takeIf { it > 0 },
+            host = url?.let { runCatching { Uri.parse(it).host }.getOrNull() },
+            stationName = icy?.name,
+            genre = icy?.genre,
+        )
+    }
+
+    private fun hasNetwork(): Boolean {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    /** Sleep timer: stop the radio after [minutes] (0 cancels). */
+    private fun setSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        if (minutes <= 0) {
+            Library.sleepAt.value = null
+            return
+        }
+        val at = System.currentTimeMillis() + minutes * 60_000L
+        Library.sleepAt.value = at
+        sleepJob = scope.launch {
+            delay(minutes * 60_000L)
+            Library.sleepAt.value = null
+            player.pause()
+        }
+    }
+
+    /**
+     * Previous station, next station, the heart (only when the station isn't in Favourite Radios
+     * yet) and Exit in the notification (names are read out by TalkBack).
+     */
+    private fun notificationButtons(): List<CommandButton> = listOfNotNull(
         CommandButton.Builder(CommandButton.ICON_PREVIOUS)
             .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
             .setDisplayName("Previous station")
@@ -119,6 +194,14 @@ class PlaybackService : MediaLibraryService() {
             .setDisplayName("Next station")
             .setSlots(CommandButton.SLOT_FORWARD)
             .build(),
+        current?.takeIf { !Library.inMine(it) }?.let {
+            CommandButton.Builder(CommandButton.ICON_HEART_UNFILLED)
+                .setCustomIconResId(R.drawable.ic_heart)
+                .setSessionCommand(StationCommands.FAVOURITE)
+                .setDisplayName("Add to Favourite Radios")
+                .setSlots(CommandButton.SLOT_OVERFLOW)
+                .build()
+        },
         CommandButton.Builder(CommandButton.ICON_UNDEFINED)
             .setCustomIconResId(R.drawable.ic_exit)
             .setSessionCommand(StationCommands.EXIT)
@@ -130,6 +213,7 @@ class PlaybackService : MediaLibraryService() {
     /** Exit: stop the radio, remove the notification, close the app screen if it is open. */
     private fun exitApp() {
         current = null
+        setSleepTimer(0)
         player.stop()
         player.clearMediaItems()
         AppExit.request()
@@ -159,6 +243,8 @@ class PlaybackService : MediaLibraryService() {
         lookedUpOnline = false
         wasPlaying = false
         Library.lastPlayed = station.id
+        Library.audio.value = null
+        refreshButtons()
         return playableItem(station, queue.firstOrNull().orEmpty())
     }
 
@@ -185,13 +271,24 @@ class PlaybackService : MediaLibraryService() {
         if (!lookedUpOnline) {
             lookedUpOnline = true
             scope.launch {
-                val backups = RadioBrowser.alternates(station).filterNot { it in queue }
-                if (current?.id != station.id || backups.isEmpty()) return@launch
+                val backups = Directory.alternates(station).filterNot { it in queue }
+                if (current?.id != station.id) return@launch
+                if (backups.isEmpty()) {
+                    gaveUp(station)
+                    return@launch
+                }
                 queue = queue + backups
                 play(station, queue[attempt])
             }
+            return
         }
-        // Otherwise every stream has failed; the error stays visible in the app and on Auto.
+        gaveUp(station)
+    }
+
+    /** Every stream failed. Without internet that says nothing about the station, so only mark it then. */
+    private fun gaveUp(station: Station) {
+        if (hasNetwork()) Library.markBroken(station.id)
+        // The error stays visible in the app and on Auto.
     }
 
     private fun play(station: Station, url: String) {
@@ -283,25 +380,32 @@ class PlaybackService : MediaLibraryService() {
         folder(DISCOVER, "More from Mauritius"),
     )
 
-    /** Finds a station by id, asking Radio Browser for ones that were never added. */
+    /** Finds a station by id, asking the directories for ones that were never added. */
     private suspend fun resolve(id: String): Station? {
         Library.find(id)?.let { return it }
-        if (!id.startsWith("rb:")) return null
-        return runCatching { RadioBrowser.byUuid(id.removePrefix("rb:")) }.getOrNull()
-            ?.also { Library.remember(listOf(it)) }
+        val found = when {
+            id.startsWith("rb:") -> runCatching { RadioBrowser.byUuid(id.removePrefix("rb:")) }.getOrNull()
+            id.startsWith("st:") -> Streema.details(id.removePrefix("st:"))?.let { d ->
+                Station(
+                    id = id, name = d.name, streams = listOfNotNull(d.stream),
+                    tags = d.genres.joinToString(", ").lowercase(), favicon = d.logo,
+                    country = d.countryCode, streemaSlug = d.slug, location = d.location,
+                )
+            }
+            else -> null
+        }
+        return found?.also { Library.remember(listOf(it)) }
     }
 
     /** Your stations first, then online Mauritius matches, then worldwide if nothing found. */
     private suspend fun searchStations(query: String): List<Station> {
         val local = Library.searchLocal(query)
-        val online = runCatching { RadioBrowser.search(query, mauritiusOnly = true) }
-            .getOrDefault(emptyList()).filterNot { Library.known(it) }
-        val world = if (local.isEmpty() && online.isEmpty()) {
-            runCatching { RadioBrowser.search(query, mauritiusOnly = false) }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
-        return (local + online + world).also { Library.remember(it) }
+        suspend fun online(place: String) = withTimeoutOrNull(10_000) {
+            runCatching { Directory.search(query, place).last() }.getOrNull()
+        }.orEmpty().filterNot { Library.known(it) || Library.isHidden(it) }
+        val mu = online(Directory.MAURITIUS)
+        val world = if (local.isEmpty() && mu.isEmpty()) online(Directory.WORLDWIDE) else emptyList()
+        return (local + mu + world).also { Library.remember(it) }
     }
 
     private fun <T> future(block: suspend () -> T): ListenableFuture<T> {
@@ -338,6 +442,8 @@ class PlaybackService : MediaLibraryService() {
                         .add(StationCommands.NEXT)
                         .add(StationCommands.PREVIOUS)
                         .add(StationCommands.EXIT)
+                        .add(StationCommands.FAVOURITE)
+                        .add(StationCommands.SLEEP)
                         .build(),
                 )
                 .setAvailablePlayerCommands(base.availablePlayerCommands)
@@ -354,6 +460,11 @@ class PlaybackService : MediaLibraryService() {
                 StationCommands.NEXT.customAction -> switchStation(+1)
                 StationCommands.PREVIOUS.customAction -> switchStation(-1)
                 StationCommands.EXIT.customAction -> exitApp()
+                StationCommands.FAVOURITE.customAction -> current?.let {
+                    Library.addToMine(it)
+                    refreshButtons()
+                }
+                StationCommands.SLEEP.customAction -> setSleepTimer(args.getInt(StationCommands.MINUTES, 0))
                 else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -464,7 +575,9 @@ class PlaybackService : MediaLibraryService() {
                     }
                 }
             }
-            if (station == null) mutableListOf() else mutableListOf(startStation(station))
+            // Stations found only on Streema get their link now.
+            val ready = station?.let { Directory.withStreams(it) }?.also { if (it !== station) Library.update(it) }
+            if (ready == null) mutableListOf() else mutableListOf(startStation(ready))
         }
 
         /** Android Auto / Bluetooth "play" with nothing queued: resume the last station. */

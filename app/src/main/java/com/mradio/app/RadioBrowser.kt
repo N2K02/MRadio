@@ -3,6 +3,7 @@ package com.mradio.app
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -28,13 +29,35 @@ object RadioBrowser {
     private var hosts: List<String>? = null
 
     /** All working Mauritius stations, most listened first. */
-    suspend fun mauritius(): List<Station> =
-        stations("/json/stations/bycountrycodeexact/MU?hidebroken=true&order=clickcount&reverse=true&limit=300")
+    suspend fun mauritius(): List<Station> = popular("MU")
 
-    suspend fun search(query: String, mauritiusOnly: Boolean): List<Station> {
+    /** Working stations most listened to, in one country ([country] like "FR") or worldwide (null). */
+    suspend fun popular(country: String?): List<Station> =
+        if (country == null) {
+            stations("/json/stations/topclick/100?hidebroken=true")
+        } else {
+            val limit = if (country.equals("MU", ignoreCase = true)) 300 else 120
+            stations("/json/stations/bycountrycodeexact/${URLEncoder.encode(country.uppercase(), "UTF-8")}?hidebroken=true&order=clickcount&reverse=true&limit=$limit")
+        }
+
+    /** Working stations named like [query], in one country ([country] like "MU") or worldwide (null). */
+    suspend fun search(query: String, country: String?): List<Station> {
         val q = URLEncoder.encode(query.trim(), "UTF-8")
-        val country = if (mauritiusOnly) "&countrycode=MU" else ""
-        return stations("/json/stations/search?name=$q$country&hidebroken=true&order=clickcount&reverse=true&limit=80")
+        val filter = if (country != null) "&countrycode=${country.uppercase()}" else ""
+        return stations("/json/stations/search?name=$q$filter&hidebroken=true&order=clickcount&reverse=true&limit=80")
+    }
+
+    /** The directory's raw entry for the same station (bitrate, codec, language, homepage…). Never throws. */
+    suspend fun details(station: Station): JSONObject? {
+        val key = normalizeName(station.name)
+        if (key.length < 3) return null
+        val country = station.country.takeIf { it.length == 2 }
+        val q = URLEncoder.encode(station.name, "UTF-8")
+        val filter = if (country != null) "&countrycode=$country" else ""
+        val a = runCatching { get("/json/stations/search?name=$q$filter&order=clickcount&reverse=true&limit=20") }.getOrNull()
+            ?: return null
+        return (0 until a.length()).map { a.getJSONObject(it) }
+            .firstOrNull { normalizeName(it.optString("name")) == key }
     }
 
     suspend fun byUuid(uuid: String): Station? =
@@ -55,11 +78,11 @@ object RadioBrowser {
     private suspend fun sameStation(station: Station): List<Station> {
         val key = normalizeName(station.name)
         if (key.length < 3) return emptyList()
-        val mu = station.country.equals("MU", ignoreCase = true)
+        val country = station.country.takeIf { it.length == 2 }
         val generic = setOf("radio", "fm", "mauritius", "maurice", "mbc", "the")
         val short = station.name.split(Regex("\\s+")).filter { it.lowercase() !in generic }.joinToString(" ")
         for (query in listOf(station.name, short).filter { it.length >= 3 }.distinct()) {
-            val found = runCatching { search(query, mauritiusOnly = mu) }.getOrDefault(emptyList())
+            val found = runCatching { search(query, country) }.getOrDefault(emptyList())
                 .filter {
                     val k = normalizeName(it.name)
                     k.length >= 3 && (k == key || k.contains(key) || key.contains(k))
@@ -78,6 +101,7 @@ object RadioBrowser {
         val favicon: String,
         val tags: String,
         val country: String,
+        val state: String,
         val score: Int,
     )
 
@@ -103,6 +127,7 @@ object RadioBrowser {
                 favicon = o.optString("favicon").trim(),
                 tags = o.optString("tags"),
                 country = o.optString("countrycode"),
+                state = o.optString("state"),
                 score = score,
             )
         }
@@ -115,7 +140,8 @@ object RadioBrowser {
                 streams = sorted.map { it.url }.distinct(),
                 tags = sorted.firstOrNull { it.tags.isNotBlank() }?.tags.orEmpty(),
                 favicon = sorted.firstOrNull { it.favicon.startsWith("http") }?.favicon,
-                country = best.country.ifBlank { "MU" },
+                country = best.country,
+                location = listOf(best.state, countryName(best.country)).filter { it.isNotBlank() }.joinToString(", "),
             )
         }
     }

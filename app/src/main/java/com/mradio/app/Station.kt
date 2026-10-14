@@ -2,6 +2,7 @@ package com.mradio.app
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 /**
  * A radio station. [streams] is ordered best first; the player falls back to the next
@@ -15,12 +16,26 @@ data class Station(
     val favicon: String? = null,
     val country: String = "MU",
     val builtIn: Boolean = false,
+    /** Streema page name (e.g. "Top_FM_8"); its stream link is looked up when needed. */
+    val streemaSlug: String? = null,
+    /** "Port Louis, Mauritius" when known. */
+    val location: String = "",
 ) {
     /** Short line under the name: up to three tags, or the country. */
     val subtitle: String
         get() = tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }.take(3)
             .joinToString(" · ")
-            .ifEmpty { if (country.equals("MU", ignoreCase = true)) "Mauritius" else country }
+            .ifEmpty { location.ifEmpty { countryName(country) } }
+
+    /** The same station with [other]'s links added as fallbacks (this station's links stay first). */
+    fun mergedWith(other: Station): Station = copy(
+        streams = (streams + other.streams).distinct(),
+        tags = tags.ifBlank { other.tags },
+        favicon = favicon ?: other.favicon,
+        streemaSlug = streemaSlug ?: other.streemaSlug,
+        location = location.ifBlank { other.location },
+        country = if (country.isBlank()) other.country else country,
+    )
 
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -29,6 +44,8 @@ data class Station(
         .put("tags", tags)
         .put("favicon", favicon ?: "")
         .put("country", country)
+        .put("streema", streemaSlug ?: "")
+        .put("location", location)
 
     companion object {
         fun fromJson(o: JSONObject): Station {
@@ -40,6 +57,8 @@ data class Station(
                 tags = o.optString("tags"),
                 favicon = o.optString("favicon").takeIf { it.startsWith("http") },
                 country = o.optString("country", "MU"),
+                streemaSlug = o.optString("streema").ifBlank { null },
+                location = o.optString("location"),
             )
         }
     }
@@ -47,6 +66,29 @@ data class Station(
 
 /** "MBC Kool FM" -> "mbckoolfm": used to spot the same station under slightly different names. */
 fun normalizeName(name: String): String = name.lowercase().filter { it.isLetterOrDigit() }
+
+/** "MU" -> "Mauritius" (in the phone's language). */
+fun countryName(code: String): String =
+    if (code.length == 2) Locale("", code.uppercase()).getDisplayCountry().ifBlank { code } else code
+
+/** "MU" -> 🇲🇺 */
+fun flagEmoji(code: String): String =
+    if (code.length != 2 || !code.all { it.isLetter() }) "🌐"
+    else code.uppercase().map { String(Character.toChars(0x1F1E6 + (it - 'A'))) }.joinToString("")
+
+/**
+ * Merges station lists from several sources into one: the same station (same name) appears once.
+ * The first one seen keeps its links first (built-in, then Radio Browser, then Streema); the
+ * others' links become its fallbacks.
+ */
+fun mergeStations(vararg lists: List<Station>): List<Station> {
+    val byKey = LinkedHashMap<String, Station>()
+    for (list in lists) for (s in list) {
+        val key = normalizeName(s.name).ifEmpty { s.id }
+        byKey[key] = byKey[key]?.mergedWith(s) ?: s
+    }
+    return byKey.values.toList()
+}
 
 /** Letters shown on the station badge: "Radio Plus Fever" -> "PF", "Top FM" -> "TF", "Tamizen" -> "T". */
 fun initials(name: String): String {
