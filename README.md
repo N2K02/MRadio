@@ -1,6 +1,12 @@
 # MRadio
 
+[![Latest release](https://img.shields.io/github/v/release/N2K02/MRadio?label=download)](https://github.com/N2K02/MRadio/releases/latest) ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white) ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Live radio from all around Mauritius, on your phone and in the car with **Android Auto**.
+
+*Mauritius radio app for Android and Android Auto: listen live to Radio Plus, Top FM, Radio One, MBC and more online radio stations.*
+
+**[⬇ Download the latest APK](https://github.com/N2K02/MRadio/releases/latest)** · Android 8.0 or newer · Free and open source
 
 - **16 Mauritius stations built in**: Radio Plus (+ Hits, Fever, Indiz), Top FM, NRJ Maurice, Radio One, MBC Radio Maurice, Kool FM, Best FM, Taal FM, Radio Mauritius, OUi Radio, Tamizen, Radio 7 and Sensuelle Radio.
 - **Favourite Radios**: your own list, starting with the 3 most popular (Radio Plus, Top FM, Radio One). Tap **−** to move a station to More from Mauritius.
