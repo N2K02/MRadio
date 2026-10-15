@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
@@ -54,6 +55,11 @@ import kotlinx.coroutines.withTimeoutOrNull
  * When all have failed, backup streams for the same station are looked up on Radio Browser and
  * Streema. The stream that plays is remembered and tried first next time. If nothing plays,
  * the station is marked as not working (the app shows an info icon for it).
+ *
+ * Reconnect: when a stream fails while there is no internet, the fallbacks are not touched (they
+ * would all fail too). The service waits for the connection to come back, retrying with a growing
+ * delay as a safety net, then starts again from the best stream. A station that was playing fine
+ * is never given up on; after every stream failed it keeps cycling with a delay in between.
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
@@ -70,6 +76,23 @@ class PlaybackService : MediaLibraryService() {
     private var lookedUpOnline = false
     private var wasPlaying = false
     private var sleepJob: Job? = null
+
+    // Reconnect state.
+    private var playedBefore = false          // this station has played fine since it was selected
+    private var waitingForNetwork = false
+    private var retryRound = 0
+    private var retryJob: Job? = null
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        // Runs on a system thread; hop to the main thread before touching the player.
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            ) {
+                scope.launch { onNetworkBack() }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -103,8 +126,17 @@ class PlaybackService : MediaLibraryService() {
                     val station = current ?: return
                     queue.getOrNull(attempt)?.let { Library.markGood(station.id, it) }
                     wasPlaying = true
+                    playedBefore = true
+                    waitingForNetwork = false
+                    retryRound = 0
+                    retryJob?.cancel()
                     updateAudioInfo()
                 }
+            }
+
+            // The user paused: stop trying to reconnect.
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) cancelRetry()
             }
 
             override fun onTracksChanged(tracks: Tracks) = updateAudioInfo()
@@ -121,6 +153,11 @@ class PlaybackService : MediaLibraryService() {
 
         // The notification's heart shows only while the station isn't in Favourite Radios.
         scope.launch { Library.mine.collect { refreshButtons() } }
+
+        runCatching {
+            (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+                .registerDefaultNetworkCallback(networkCallback)
+        }
     }
 
     private fun refreshButtons() {
@@ -160,7 +197,9 @@ class PlaybackService : MediaLibraryService() {
     private fun hasNetwork(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        // VALIDATED: connected to Wi-Fi/mobile data that actually reaches the internet.
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     /** Sleep timer: stop the radio after [minutes] (0 cancels). */
@@ -213,6 +252,7 @@ class PlaybackService : MediaLibraryService() {
     /** Exit: stop the radio, remove the notification, close the app screen if it is open. */
     private fun exitApp() {
         current = null
+        cancelRetry()
         setSleepTimer(0)
         player.stop()
         player.clearMediaItems()
@@ -227,6 +267,10 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        runCatching {
+            (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+                .unregisterNetworkCallback(networkCallback)
+        }
         scope.cancel()
         session.release()
         player.release()
@@ -242,6 +286,8 @@ class PlaybackService : MediaLibraryService() {
         attempt = 0
         lookedUpOnline = false
         wasPlaying = false
+        playedBefore = false
+        cancelRetry()
         Library.lastPlayed = station.id
         Library.audio.value = null
         refreshButtons()
@@ -252,14 +298,20 @@ class PlaybackService : MediaLibraryService() {
         val station = current ?: return
         if (player.currentMediaItem?.mediaId != station.id) return
 
+        // The user paused: don't fight them.
+        if (!player.playWhenReady) return
+
+        // No internet: every stream would fail, so skip the fallbacks and wait for the connection.
+        if (!hasNetwork()) {
+            waitForNetwork(station)
+            return
+        }
+
         // A stream that was playing dropped (tunnel, network switch): retry it once first.
         if (wasPlaying) {
             wasPlaying = false
             val url = queue.getOrNull(attempt) ?: return
-            scope.launch {
-                delay(2000)
-                if (current?.id == station.id) play(station, url)
-            }
+            scheduleRetry(station, 2000) { play(station, url) }
             return
         }
 
@@ -285,10 +337,72 @@ class PlaybackService : MediaLibraryService() {
         gaveUp(station)
     }
 
-    /** Every stream failed. Without internet that says nothing about the station, so only mark it then. */
+    /**
+     * Every stream failed. Without internet that says nothing about the station, so wait for it.
+     * A station that played fine earlier is not marked as broken either: it is retried from the
+     * best stream after a delay (the provider may just be restarting).
+     */
     private fun gaveUp(station: Station) {
-        if (hasNetwork()) Library.markBroken(station.id)
+        if (!hasNetwork()) {
+            waitForNetwork(station)
+            return
+        }
+        if (playedBefore) {
+            scheduleRetry(station, nextBackoff()) { restartCycle(station) }
+            return
+        }
+        Library.markBroken(station.id)
         // The error stays visible in the app and on Auto.
+    }
+
+    // ---------------------------------------------------------------- reconnect
+
+    /** Waits for the connection to return; a timer retries anyway in case the network never reports as validated. */
+    private fun waitForNetwork(station: Station) {
+        waitingForNetwork = true
+        scheduleRetry(station, nextBackoff()) {
+            waitingForNetwork = false
+            restartCycle(station)
+        }
+    }
+
+    /** Called when a validated internet connection appears. */
+    private fun onNetworkBack() {
+        if (!waitingForNetwork) return
+        val station = current ?: return
+        waitingForNetwork = false
+        retryRound = 0
+        // Give the connection a moment to settle before reconnecting.
+        scheduleRetry(station, 1500) { restartCycle(station) }
+    }
+
+    /** Starts again from the best stream (the remembered one first, then the fallbacks). */
+    private fun restartCycle(station: Station) {
+        val first = queue.firstOrNull() ?: return
+        attempt = 0
+        wasPlaying = false
+        play(station, first)
+    }
+
+    private fun scheduleRetry(station: Station, delayMs: Long, action: () -> Unit) {
+        retryJob?.cancel()
+        retryJob = scope.launch {
+            delay(delayMs)
+            if (current?.id != station.id || !player.playWhenReady) return@launch
+            action()
+        }
+    }
+
+    private fun cancelRetry() {
+        retryJob?.cancel()
+        waitingForNetwork = false
+        retryRound = 0
+    }
+
+    /** 3s, 5s, 10s, 20s, then every 30s. */
+    private fun nextBackoff(): Long {
+        val steps = longArrayOf(3_000, 5_000, 10_000, 20_000, 30_000)
+        return steps[minOf(retryRound++, steps.size - 1)]
     }
 
     private fun play(station: Station, url: String) {
