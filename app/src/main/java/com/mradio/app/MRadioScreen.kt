@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -104,6 +105,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -182,6 +184,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     var infoFor by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
+
+    // Tap a section title to fold its list away. Kept across rotation and process restarts.
+    var favouritesOpen by rememberSaveable { mutableStateOf(true) }
+    var moreOpen by rememberSaveable { mutableStateOf(true) }
 
     fun choosePlace(p: String) {
         place = p
@@ -409,19 +415,26 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
 
                 if (query.isBlank()) {
-                    header("Favourite Radios")
-                    if (myList.isEmpty()) message("Tap the heart on any station below to add it here.")
-                    items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
+                    header("Favourite Radios", expanded = favouritesOpen) { favouritesOpen = !favouritesOpen }
+                    if (favouritesOpen) {
+                        if (myList.isEmpty()) message("Tap the heart on any station below to add it here.")
+                        items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
+                    }
 
-                    header(if (place == Directory.WORLDWIDE) "Popular worldwide" else "More from ${placeName(place)}")
-                    items(moreList.take(moreShown), key = { "more-" + it.id }) { StationItem(it, false, moreList, Modifier.animateItem()) }
-                    showMore(shown = moreShown, total = moreList.size) { moreShown += PAGE }
-                    when {
-                        discovered != null -> if (moreList.isEmpty()) message("No other stations found here.")
-                        discoverFailed -> item {
-                            RetryMessage("Couldn't reach the station directories for more stations.") { discoverKey++ }
+                    header(
+                        if (place == Directory.WORLDWIDE) "Popular worldwide" else "More from ${placeName(place)}",
+                        expanded = moreOpen,
+                    ) { moreOpen = !moreOpen }
+                    if (moreOpen) {
+                        items(moreList.take(moreShown), key = { "more-" + it.id }) { StationItem(it, false, moreList, Modifier.animateItem()) }
+                        showMore(shown = moreShown, total = moreList.size) { moreShown += PAGE }
+                        when {
+                            discovered != null -> if (moreList.isEmpty()) message("No other stations found here.")
+                            discoverFailed -> item {
+                                RetryMessage("Couldn't reach the station directories for more stations.") { discoverKey++ }
+                            }
+                            else -> loading()
                         }
-                        else -> loading()
                     }
                     if (hidden.isNotEmpty()) {
                         item(key = "hidden") {
@@ -667,14 +680,40 @@ private fun HiddenStationsDialog(hidden: Map<String, String>, onRestore: (String
 
 // ---------------------------------------------------------------- list parts
 
-private fun LazyListScope.header(text: String) = item(key = "h-$text") {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp),
-    )
+/**
+ * A section title. Pass [expanded] and [onToggle] to make it collapsible: tapping the whole row
+ * folds or unfolds the list under it, and the arrow turns to show which.
+ */
+private fun LazyListScope.header(
+    text: String,
+    expanded: Boolean? = null,
+    onToggle: () -> Unit = {},
+) = item(key = "h-$text") {
+    val collapsible = expanded != null
+    val arrow by animateFloatAsState(if (expanded == false) -90f else 0f, label = "header arrow")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (collapsible) Modifier.clickable(onClickLabel = if (expanded == true) "Collapse $text" else "Expand $text", onClick = onToggle) else Modifier)
+            .padding(start = 24.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+        )
+        if (collapsible) {
+            Icon(
+                Icons.Rounded.KeyboardArrowDown,
+                contentDescription = if (expanded == true) "Collapse $text" else "Expand $text",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.rotate(arrow),
+            )
+        }
+    }
 }
 
 /** Stations shown per page in long lists. */
