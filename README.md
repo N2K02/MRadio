@@ -57,3 +57,14 @@ Every push to `main` builds the APK with GitHub Actions and publishes it as a re
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+
+## Official download and project links
+
+Mauritius radio streaming app for Android and Android Auto with local radio stations, favourites, and playback controls.
+
+- **Latest Android APK:** [Download the latest release](https://github.com/N2K02/MRadio/releases/latest)
+- **All releases and version history:** [GitHub Releases](https://github.com/N2K02/MRadio/releases)
+- **Source code and issue reporting:** [MRadio repository](https://github.com/N2K02/MRadio)
+
+The APK is distributed through GitHub Releases. If no release is available, check the repository's Releases page for future published builds. Google indexing is not guaranteed; this section provides clear crawlable links for visitors and search engines.
