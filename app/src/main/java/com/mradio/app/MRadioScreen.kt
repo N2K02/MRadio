@@ -91,6 +91,10 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.toShape
@@ -1281,30 +1285,62 @@ private fun FullPlayer(
             // Volume
             VolumeRow(Modifier.padding(bottom = 12.dp))
 
-            // Sleep timer
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
+            // Sleep timer: lined up with the volume row (icon in the same column as "−", buttons
+            // between), and the time left on its own line underneath.
+            var chosen by rememberSaveable { mutableIntStateOf(0) }
+            LaunchedEffect(sleepAt) { if (sleepAt == null) chosen = 0 }
+            val left = sleepAt?.let { ((it - now) / 60_000L + 1).coerceAtLeast(1) }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             ) {
-                Icon(Icons.Rounded.Bedtime, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                val left = sleepAt?.let { ((it - now) / 60_000L + 1).coerceAtLeast(1) }
-                listOf(15, 30, 60, 90).forEach { m ->
-                    FilterChip(
-                        selected = false,
-                        onClick = { onSleep(m) },
-                        label = { Text("$m min") },
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Bedtime,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                            tint = if (left != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    BoxWithConstraints(Modifier.weight(1f)) {
+                        val short = maxWidth < 290.dp
+                        val options = listOf(15, 30, 60, 90)
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            options.forEachIndexed { i, m ->
+                                SegmentedButton(
+                                    selected = left != null && chosen == m,
+                                    onClick = {
+                                        if (left != null && chosen == m) {
+                                            onSleep(0)
+                                            chosen = 0
+                                        } else {
+                                            onSleep(m)
+                                            chosen = m
+                                        }
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(index = i, count = options.size),
+                                    icon = {},
+                                    label = { Text(if (short) "$m" else "$m min", maxLines = 1, softWrap = false) },
+                                )
+                            }
+                        }
+                    }
+                    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        if (left != null) {
+                            IconButton(onClick = { onSleep(0); chosen = 0 }) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Cancel the sleep timer")
+                            }
+                        }
+                    }
                 }
-                if (left != null) {
-                    FilterChip(
-                        selected = true,
-                        onClick = { onSleep(0) },
-                        label = { Text("Stops in $left min  ✕") },
-                    )
-                }
+                Text(
+                    if (left != null) "Radio stops in $left min" else "Sleep timer",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (left != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
             }
 
             // Details
