@@ -12,10 +12,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -26,9 +24,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -69,6 +64,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -202,6 +198,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var infoFor by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
     var settingsMenu by remember { mutableStateOf(false) }
+    val updateState by AppUpdater.state.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
     // Tap a section title to fold its list away. Kept across rotation and process restarts.
@@ -353,10 +350,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.nestedScroll(FooterScroll.connection),
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-              Column {
+              // Keeps the player clear of the navigation keys / gesture bar.
+              Column(Modifier.navigationBarsPadding()) {
                 AnimatedVisibility(
                     visible = current != null && !playerOpen,
                     enter = slideInVertically { it },
@@ -374,16 +371,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
                         )
                     }
-                }
-                UpdateFooterBar("MRadio")
-                // The footer keeps the navigation bar's space free while it is showing. When it has
-                // slid away, do it here, so the player never ends up behind the navigation keys.
-                AnimatedVisibility(
-                    visible = !updateFooterShown(),
-                    enter = expandVertically(expandFrom = Alignment.Top),
-                    exit = shrinkVertically(shrinkTowards = Alignment.Top),
-                ) {
-                    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                 }
               }
             },
@@ -414,6 +401,33 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                     onClick = {
                                         settingsMenu = false
                                         equalizerOpen = true
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text("Update")
+                                            Text(
+                                                when (val u = updateState) {
+                                                    is AppUpdater.State.Checking -> "Checking…"
+                                                    is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
+                                                    is AppUpdater.State.Downloading -> "Downloading…"
+                                                    is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
+                                                    is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
+                                                    else -> "v${AppUpdater.installedVersionName} · check for updates"
+                                                },
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    },
+                                    leadingIcon = { Icon(Icons.Rounded.SystemUpdate, contentDescription = null) },
+                                    onClick = {
+                                        settingsMenu = false
+                                        // Other states already show their card with the right buttons.
+                                        if (updateState is AppUpdater.State.Idle || updateState is AppUpdater.State.UpToDate ||
+                                            updateState is AppUpdater.State.Failed
+                                        ) AppUpdater.check(manual = true)
                                     },
                                 )
                             }
