@@ -1214,6 +1214,9 @@ private fun FullPlayer(
                 }
             }
 
+            // Volume
+            VolumeRow(Modifier.padding(bottom = 12.dp))
+
             // Sleep timer
             Row(
                 verticalAlignment = Alignment.CenterVertically,
