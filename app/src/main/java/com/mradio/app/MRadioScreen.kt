@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Pause
@@ -187,6 +188,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
     // Tap a section title to fold its list away. Kept across rotation and process restarts.
     var favouritesOpen by rememberSaveable { mutableStateOf(true) }
+    // Reorder mode for Favourite Radios: up/down arrows replace the remove button.
+    var arranging by rememberSaveable { mutableStateOf(false) }
     var moreOpen by rememberSaveable { mutableStateOf(true) }
 
     fun choosePlace(p: String) {
@@ -324,6 +327,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             onHeart = { if (isMine) removeFromMine(station) else addToMine(station) },
             onRemove = { removeFromMine(station) },
             onInfo = { infoFor = station },
+            onMoveUp = if (inMineSection && arranging) ({ Library.moveInMine(station.id, -1) }) else null,
+            onMoveDown = if (inMineSection && arranging) ({ Library.moveInMine(station.id, +1) }) else null,
             modifier = modifier,
         )
     }
@@ -415,7 +420,13 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
 
                 if (query.isBlank()) {
-                    header("Favourite Radios", expanded = favouritesOpen) { favouritesOpen = !favouritesOpen }
+                    header(
+                        "Favourite Radios",
+                        expanded = favouritesOpen,
+                        action = if (favouritesOpen && myList.size > 1) {
+                            { TextButton(onClick = { arranging = !arranging }) { Text(if (arranging) "Done" else "Reorder") } }
+                        } else null,
+                    ) { favouritesOpen = !favouritesOpen }
                     if (favouritesOpen) {
                         if (myList.isEmpty()) message("Tap the heart on any station below to add it here.")
                         items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
@@ -687,6 +698,7 @@ private fun HiddenStationsDialog(hidden: Map<String, String>, onRestore: (String
 private fun LazyListScope.header(
     text: String,
     expanded: Boolean? = null,
+    action: (@Composable () -> Unit)? = null,
     onToggle: () -> Unit = {},
 ) = item(key = "h-$text") {
     val collapsible = expanded != null
@@ -705,6 +717,7 @@ private fun LazyListScope.header(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f).padding(vertical = 8.dp),
         )
+        action?.invoke()
         if (collapsible) {
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
@@ -786,6 +799,8 @@ private fun StationRow(
     onHeart: () -> Unit,
     onRemove: () -> Unit,
     onInfo: () -> Unit,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     ListItem(
@@ -814,7 +829,14 @@ private fun StationRow(
                         Icon(Icons.Rounded.Info, contentDescription = "Why isn't it working?", tint = MaterialTheme.colorScheme.error)
                     }
                 }
-                if (inMineSection) {
+                if (onMoveUp != null && onMoveDown != null) {
+                    IconButton(onClick = onMoveUp) {
+                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move ${station.name} up")
+                    }
+                    IconButton(onClick = onMoveDown) {
+                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move ${station.name} down")
+                    }
+                } else if (inMineSection) {
                     IconButton(onClick = onRemove) {
                         Icon(
                             Icons.Rounded.RemoveCircleOutline,

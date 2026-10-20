@@ -197,6 +197,18 @@ object Library {
         return keep.id
     }
 
+    /** Moves a station up ([offset] -1) or down (+1) in Favourite Radios. */
+    fun moveInMine(id: String, offset: Int) {
+        val list = _mine.value.toMutableList()
+        val from = list.indexOf(id)
+        if (from < 0) return
+        val to = (from + offset).coerceIn(0, list.lastIndex)
+        if (to == from) return
+        list.add(to, list.removeAt(from))
+        _mine.value = list
+        saveMine()
+    }
+
     /** Takes the station out of Favourite Radios. */
     fun removeFromMine(id: String) {
         if (id in _mine.value) {

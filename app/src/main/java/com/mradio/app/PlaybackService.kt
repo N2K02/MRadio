@@ -18,7 +18,9 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
+import androidx.media3.common.Metadata
 import androidx.media3.extractor.metadata.icy.IcyHeaders
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -76,6 +78,8 @@ class PlaybackService : MediaLibraryService() {
     private var lookedUpOnline = false
     private var wasPlaying = false
     private var sleepJob: Job? = null
+    /** The song the station last announced (ICY "StreamTitle"), shown instead of the station name. */
+    private var lastSong: String? = null
 
     // Reconnect state.
     private var playedBefore = false          // this station has played fine since it was selected
@@ -140,6 +144,13 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onTracksChanged(tracks: Tracks) = updateAudioInfo()
+
+            // Many stations announce the song in the stream ("Artist - Title").
+            override fun onMetadata(metadata: Metadata) {
+                for (i in 0 until metadata.length()) {
+                    (metadata.get(i) as? IcyInfo)?.let { showSong(it.title) }
+                }
+            }
         })
 
         val openApp = PendingIntent.getActivity(
@@ -194,6 +205,23 @@ class PlaybackService : MediaLibraryService() {
         )
     }
 
+    /**
+     * Puts the playing song in the title (notification, lock screen, Android Auto and the app) with
+     * the station as the artist line. The item is updated in place, so playback isn't interrupted.
+     */
+    private fun showSong(raw: String?) {
+        val station = current ?: return
+        val song = raw?.trim()?.takeIf { it.length > 1 && it != "-" && !it.equals(station.name, ignoreCase = true) }
+        if (song == lastSong) return
+        lastSong = song
+        val item = player.currentMediaItem ?: return
+        if (item.mediaId != station.id) return
+        val meta = metadata(station, artwork = true).buildUpon()
+            .apply { if (song != null) setTitle(song).setArtist(station.name) }
+            .build()
+        runCatching { player.replaceMediaItem(player.currentMediaItemIndex, item.buildUpon().setMediaMetadata(meta).build()) }
+    }
+
     private fun hasNetwork(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
@@ -205,6 +233,7 @@ class PlaybackService : MediaLibraryService() {
     /** Sleep timer: stop the radio after [minutes] (0 cancels). */
     private fun setSleepTimer(minutes: Int) {
         sleepJob?.cancel()
+        player.volume = 1f
         if (minutes <= 0) {
             Library.sleepAt.value = null
             return
@@ -212,9 +241,17 @@ class PlaybackService : MediaLibraryService() {
         val at = System.currentTimeMillis() + minutes * 60_000L
         Library.sleepAt.value = at
         sleepJob = scope.launch {
-            delay(minutes * 60_000L)
+            // Fade out over the last 30 seconds instead of cutting off.
+            val fadeMs = minOf(30_000L, minutes * 60_000L)
+            delay(minutes * 60_000L - fadeMs)
+            val steps = 30
+            for (i in steps - 1 downTo 0) {
+                player.volume = i / steps.toFloat()
+                delay(fadeMs / steps)
+            }
             Library.sleepAt.value = null
             player.pause()
+            player.volume = 1f
         }
     }
 
@@ -290,6 +327,7 @@ class PlaybackService : MediaLibraryService() {
         cancelRetry()
         Library.lastPlayed = station.id
         Library.audio.value = null
+        lastSong = null
         refreshButtons()
         return playableItem(station, queue.firstOrNull().orEmpty())
     }

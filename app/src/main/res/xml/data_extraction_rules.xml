@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and newer: Favourite Radios and settings move to a new phone and come back after a reinstall. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="mradio.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="mradio.xml" />
+    </device-transfer>
+</data-extraction-rules>
