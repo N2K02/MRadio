@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -59,10 +60,13 @@ import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
@@ -185,6 +189,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     var infoFor by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
+    var settingsMenu by remember { mutableStateOf(false) }
+    var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
     // Tap a section title to fold its list away. Kept across rotation and process restarts.
     var favouritesOpen by rememberSaveable { mutableStateOf(true) }
@@ -376,6 +382,22 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f),
                         )
+                        Box {
+                            FilledTonalIconButton(onClick = { settingsMenu = true }) {
+                                Icon(Icons.Rounded.Settings, contentDescription = "Settings")
+                            }
+                            DropdownMenu(expanded = settingsMenu, onDismissRequest = { settingsMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Equalizer") },
+                                    leadingIcon = { Icon(Icons.Rounded.GraphicEq, contentDescription = null) },
+                                    onClick = {
+                                        settingsMenu = false
+                                        equalizerOpen = true
+                                    },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
                         FilledTonalIconButton(onClick = onExit) {
                             Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Exit")
                         }
@@ -511,6 +533,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             }
         }
     }
+
+    if (equalizerOpen) EqualizerSheet(onDismiss = { equalizerOpen = false })
 
     if (pickCountry) {
         CountryPicker(
