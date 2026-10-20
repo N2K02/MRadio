@@ -192,6 +192,15 @@ private fun Notes(release: AppUpdater.Release) {
     }
 }
 
+/** Whether [UpdateFooterBar] is on screen right now (it also keeps the navigation bar's space free). */
+@Composable
+fun updateFooterShown(): Boolean {
+    val state by AppUpdater.state.collectAsState()
+    val busy = state is AppUpdater.State.Downloading || state is AppUpdater.State.Ready ||
+        state is AppUpdater.State.NeedsPermission
+    return FooterScroll.visible || busy
+}
+
 /**
  * Slim footer fixed at the bottom: app name and version on the left, the update action on
  * the right. Slides away while scrolling down (see [FooterScroll]) and stays visible while an
@@ -201,11 +210,9 @@ private fun Notes(release: AppUpdater.Release) {
 fun UpdateFooterBar(appName: String, modifier: Modifier = Modifier) {
     val state by AppUpdater.state.collectAsState()
     val activity = LocalContext.current.activity()
-    val busy = state is AppUpdater.State.Downloading || state is AppUpdater.State.Ready ||
-        state is AppUpdater.State.NeedsPermission
     val scheme = MaterialTheme.colorScheme
     AnimatedVisibility(
-        visible = FooterScroll.visible || busy,
+        visible = updateFooterShown(),
         enter = expandVertically(expandFrom = Alignment.Top),
         exit = shrinkVertically(shrinkTowards = Alignment.Top),
         modifier = modifier,

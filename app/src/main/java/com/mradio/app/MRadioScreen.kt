@@ -11,8 +11,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -23,6 +25,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -364,6 +369,15 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     }
                 }
                 UpdateFooterBar("MRadio")
+                // The footer keeps the navigation bar's space free while it is showing. When it has
+                // slid away, do it here, so the player never ends up behind the navigation keys.
+                AnimatedVisibility(
+                    visible = !updateFooterShown(),
+                    enter = expandVertically(expandFrom = Alignment.Top),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Top),
+                ) {
+                    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+                }
               }
             },
         ) { padding ->
