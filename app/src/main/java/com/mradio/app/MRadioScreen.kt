@@ -620,7 +620,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     item(key = "home-player") {
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(24.dp),
+                            shape = RoundedCornerShape(22.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
                             onClick = { if (current != null) playerOpen = true },
                         ) {
@@ -1230,7 +1230,7 @@ private fun StationRow(
         leadingContent = { StationBadge(station, spinning = isPlaying) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+                IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
                     Icon(
                         if (isPlayRequested) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (isPlayRequested) "Pause ${station.name}" else "Play ${station.name}",
@@ -1289,7 +1289,7 @@ private fun StationRow(
         ),
         modifier = modifier
             .padding(horizontal = 16.dp, vertical = 3.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
     )
 }
@@ -1301,36 +1301,7 @@ private fun StationRow(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
-    val shapes = listOf(
-        MaterialShapes.Cookie9Sided,
-        MaterialShapes.Clover4Leaf,
-        MaterialShapes.Sunny,
-        MaterialShapes.Gem,
-        MaterialShapes.Cookie6Sided,
-        MaterialShapes.Flower,
-        MaterialShapes.Pentagon,
-    )
-    val index = Math.floorMod(station.name.hashCode(), shapes.size)
     val scheme = MaterialTheme.colorScheme
-    val (bg, fg) = when (Math.floorMod(station.name.hashCode() / 7, 3)) {
-        0 -> scheme.primaryContainer to scheme.onPrimaryContainer
-        1 -> scheme.tertiaryContainer to scheme.onTertiaryContainer
-        else -> scheme.secondaryContainer to scheme.onSecondaryContainer
-    }
-    val rotation = if (spinning) {
-        val t = rememberInfiniteTransition(label = "badge")
-        t.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Restart),
-            label = "rotation",
-        ).value
-    } else {
-        0f
-    }
-    val shape = shapes[index].toShape()
-
-    // Logo: the station's own, one found earlier, or look one up once for stations in the list.
     var logo by remember(station.id) { mutableStateOf(Library.logo(station)) }
     LaunchedEffect(station.id) {
         if (logo == null && Library.shouldLookUpLogo(station)) {
@@ -1340,40 +1311,24 @@ private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
             }
         }
     }
-    var loaded by remember(logo) { mutableStateOf(false) }
-
-    Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer { rotationZ = rotation }
-                .clip(shape)
-                .background(if (spinning) scheme.primary else bg),
+    Box(
+        Modifier.size(size.dp).clip(RoundedCornerShape((size / 4).dp))
+            .background(scheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            initials(station.name),
+            style = if (size >= 100) MaterialTheme.typography.displayMedium
+                else MaterialTheme.typography.titleMedium,
+            color = scheme.primary,
+            fontWeight = FontWeight.Bold,
         )
-        if (!loaded) {
-            Text(
-                initials(station.name),
-                color = if (spinning) scheme.onPrimary else fg,
-                style = when {
-                    size >= 120 -> MaterialTheme.typography.displayMedium
-                    size >= 48 -> MaterialTheme.typography.titleMedium
-                    else -> MaterialTheme.typography.labelLarge
-                },
-                fontWeight = FontWeight.Bold,
-            )
-        }
         logo?.let { url ->
             AsyncImage(
                 model = url,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                onSuccess = { loaded = true },
-                onError = { loaded = false },
-                modifier = Modifier
-                    .size((size * 0.7f).dp)
-                    .clip(CircleShape)
-                    .background(if (loaded) Color.White else Color.Transparent)
-                    .padding(if (loaded) (size / 16).dp else 0.dp),
+                modifier = Modifier.fillMaxSize().padding((size / 10).dp),
             )
         }
     }
@@ -1410,8 +1365,8 @@ private fun NowPlayingBar(
     )
     Surface(
         color = barColor,
-        shape = RoundedCornerShape(32.dp),
-        tonalElevation = 3.dp,
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 0.dp,
         onClick = onOpen,
         modifier = Modifier
             .fillMaxWidth()
@@ -1606,7 +1561,7 @@ private fun FullPlayer(
 
             // Keep the artwork visually grouped, without adding animation work when paused.
             Surface(
-                shape = RoundedCornerShape(36.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
             ) {
