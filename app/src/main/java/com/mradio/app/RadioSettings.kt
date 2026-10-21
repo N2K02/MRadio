@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.BugReport
@@ -69,6 +70,10 @@ fun RadioSettings(
     val playbackEvents by Library.events.collectAsState()
     val listeningStats by Library.listeningStats.collectAsState()
     val stationList by Library.stations.collectAsState()
+    val alarmAt by RadioAlarm.alarmAt.collectAsState()
+    var alarmStationId by rememberSaveable { mutableStateOf("") }
+    var alarmMenuOpen by remember { mutableStateOf(false) }
+    var alarmError by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     var backupStatus by remember { mutableStateOf<String?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -190,6 +195,12 @@ fun RadioSettings(
                                 modifier = Modifier.clickable { page = "Playback & audio" },
                             )
                             ListItem(
+                                headlineContent = { Text("Radio alarm") },
+                                supportingContent = { Text("Schedule a station to play at a chosen time") },
+                                leadingContent = { Icon(Icons.Rounded.Alarm, null) },
+                                modifier = Modifier.clickable { page = "Radio alarm" },
+                            )
+                            ListItem(
                                 headlineContent = { Text("Listening statistics") },
                                 supportingContent = { Text("Time listened and estimated Wi-Fi / mobile streaming") },
                                 leadingContent = { Icon(Icons.Rounded.BarChart, null) },
@@ -238,6 +249,91 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { onEqualizer() },
                             )
+                        } else if (current == "Radio alarm") {
+                            val available = (Library.myStations() + stationList).distinctBy { it.id }
+                            val chosen = available.firstOrNull { it.id == alarmStationId }
+                                ?: available.firstOrNull { it.id == RadioAlarm.scheduledStation(context) }
+                                ?: available.firstOrNull()
+                            ListItem(
+                                headlineContent = { Text("Alarm station") },
+                                supportingContent = { Text(chosen?.name ?: "No stations available") },
+                                trailingContent = {
+                                    androidx.compose.foundation.layout.Box {
+                                        TextButton(onClick = { alarmMenuOpen = true }) { Text("Choose") }
+                                        androidx.compose.material3.DropdownMenu(
+                                            expanded = alarmMenuOpen,
+                                            onDismissRequest = { alarmMenuOpen = false },
+                                        ) {
+                                            available.take(100).forEach { station ->
+                                                androidx.compose.material3.DropdownMenuItem(
+                                                    text = { Text(station.name) },
+                                                    onClick = {
+                                                        alarmStationId = station.id
+                                                        alarmMenuOpen = false
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                            alarmAt?.let { at ->
+                                ListItem(
+                                    headlineContent = { Text("Upcoming alarm") },
+                                    supportingContent = {
+                                        Text(java.text.DateFormat.getDateTimeInstance(
+                                            java.text.DateFormat.MEDIUM,
+                                            java.text.DateFormat.SHORT,
+                                        ).format(java.util.Date(at)))
+                                    },
+                                    trailingContent = {
+                                        TextButton(onClick = { RadioAlarm.cancel(context) }) { Text("Cancel") }
+                                    },
+                                )
+                            }
+                            ListItem(
+                                headlineContent = { Text("Set one-time alarm") },
+                                supportingContent = { Text("Choose a time. If today's time has passed, the alarm is set for tomorrow.") },
+                                leadingContent = { Icon(Icons.Rounded.Alarm, null) },
+                                modifier = Modifier.clickable {
+                                    if (chosen == null) {
+                                        alarmError = "Add or select a station first"
+                                    } else if (!RadioAlarm.canSchedule(context)) {
+                                        alarmError = "Allow exact alarms in Android settings, then return to schedule."
+                                        runCatching { RadioAlarm.requestPermission(context) }
+                                    } else {
+                                        val now = java.util.Calendar.getInstance()
+                                        android.app.TimePickerDialog(
+                                            context,
+                                            { _, hour, minute ->
+                                                val target = java.util.Calendar.getInstance().apply {
+                                                    set(java.util.Calendar.HOUR_OF_DAY, hour)
+                                                    set(java.util.Calendar.MINUTE, minute)
+                                                    set(java.util.Calendar.SECOND, 0)
+                                                    set(java.util.Calendar.MILLISECOND, 0)
+                                                    if (timeInMillis <= System.currentTimeMillis()) add(java.util.Calendar.DAY_OF_YEAR, 1)
+                                                }
+                                                alarmError = runCatching {
+                                                    RadioAlarm.schedule(context, target.timeInMillis, chosen.id)
+                                                    null
+                                                }.getOrElse { it.message ?: "Could not schedule alarm" }
+                                            },
+                                            now.get(java.util.Calendar.HOUR_OF_DAY),
+                                            now.get(java.util.Calendar.MINUTE),
+                                            true,
+                                        ).show()
+                                    }
+                                },
+                            )
+                            ListItem(
+                                headlineContent = { Text("Android alarm access") },
+                                supportingContent = { Text("Exact-alarm permission may be required. The alarm needs network access to play, and may not survive a device restart.") },
+                            )
+                            alarmError?.let { message ->
+                                ListItem(headlineContent = {
+                                    Text(message, color = MaterialTheme.colorScheme.error)
+                                })
+                            }
                         } else if (current == "Custom stations") {
                             ListItem(
                                 headlineContent = { Text("Add station") },
