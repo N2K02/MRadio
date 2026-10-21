@@ -80,9 +80,15 @@ fun RadioSettings(
         if (uri != null) {
             backupStatus = runCatching {
                 val json = context.contentResolver.openInputStream(uri)?.use { stream ->
-                    val data = stream.readNBytes(1_000_001)
-                    require(data.size <= 1_000_000) { "Backup is too large" }
-                    String(data, Charsets.UTF_8)
+                    val output = java.io.ByteArrayOutputStream()
+                    val chunk = ByteArray(8192)
+                    while (true) {
+                        val count = stream.read(chunk)
+                        if (count < 0) break
+                        require(output.size() + count <= 1_000_000) { "Backup is too large" }
+                        output.write(chunk, 0, count)
+                    }
+                    output.toString(Charsets.UTF_8.name())
                 } ?: error("Could not read backup file")
                 val count = Library.restoreBackup(json)
                 "Restored $count favorite stations and settings"
