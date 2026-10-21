@@ -37,14 +37,13 @@ class RadioQuickTileService : TileService() {
                     if (station != null) {
                         controller.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
                         controller.prepare()
+                        controller.play()
+                    } else {
+                        launchApp()
                     }
-                } else if (controller.playbackState == Player.STATE_IDLE) {
-                    controller.prepare()
-                }
-                if (controller.mediaItemCount > 0) controller.play()
-                else {
-                    // No saved station is available yet; open the app to choose one.
-                    launchApp()
+                } else {
+                    if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
+                    controller.play()
                 }
             }
             render(controller.isPlaying)
