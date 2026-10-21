@@ -140,11 +140,16 @@ class PlaybackService : MediaLibraryService() {
 
         player.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
+                Library.logPlayback("Stream error ${error.errorCodeName} · ${current?.name ?: "unknown"}")
                 onStreamFailed()
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_BUFFERING) {
+                    Library.logPlayback("Buffering · ${current?.name ?: "unknown"}")
+                }
                 if (playbackState == Player.STATE_READY) {
+                    Library.logPlayback("Playing · ${current?.name ?: "unknown"}")
                     val station = current ?: return
                     queue.getOrNull(attempt)?.let { Library.markGood(station.id, it) }
                     wasPlaying = true
@@ -337,6 +342,8 @@ class PlaybackService : MediaLibraryService() {
     /** Sets up the fallback queue for [station] and returns the item for its best stream. */
     private fun startStation(station: Station): MediaItem {
         current = station
+        Library.recordPlayed(station)
+        Library.logPlayback("Selected · ${station.name}")
         queue = Library.orderedStreams(station)
         attempt = 0
         lookedUpOnline = false
