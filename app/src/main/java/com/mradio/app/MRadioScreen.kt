@@ -606,17 +606,17 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     item(key = "home-player") {
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = RoundedCornerShape(24.dp),
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             onClick = { if (current != null) playerOpen = true },
                         ) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.padding(horizontal = 18.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 52)
-                                    else Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 60)
+                                    else Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
                                         Icon(Icons.Rounded.GraphicEq, contentDescription = null)
                                     }
-                                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                    Column(Modifier.weight(1f).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                         Text("NOW PLAYING",
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.labelSmall)
@@ -647,7 +647,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                     }
                                 }
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
                                     horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -661,7 +661,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                                 if (player.failed) retry(current) else playOrPause(current, emptyList())
                                             } else myList.firstOrNull()?.let { playOrPause(it, myList) }
                                         },
-                                        modifier = Modifier.size(48.dp),
+                                        modifier = Modifier.size(56.dp),
                                         enabled = controller != null,
                                     ) {
                                         Icon(
