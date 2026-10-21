@@ -257,6 +257,58 @@ object AppUpdater {
         }
     }
 
+    /** Only choose completed, successful PR runs; never use an unsigned or failed artifact. */
+    private suspend fun latestExperimental(): Release? = withContext(Dispatchers.IO) {
+        fun requestJson(address: String): JSONObject {
+            val connection = URL(address).openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = 10_000
+                connection.readTimeout = 15_000
+                connection.setRequestProperty("Accept", "application/vnd.github+json")
+                connection.setRequestProperty("User-Agent", "$appName-updater (Android)")
+                if (connection.responseCode != 200) throw httpError(connection, connection.responseCode)
+                return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            } finally {
+                connection.disconnect()
+            }
+        }
+        val runs = requestJson(
+            "https://api.github.com/repos/$repo/actions/workflows/build.yml/runs?event=pull_request&status=success&per_page=30"
+        ).optJSONArray("workflow_runs") ?: return@withContext null
+        for (i in 0 until runs.length()) {
+            val run = runs.getJSONObject(i)
+            if (run.optString("conclusion") != "success" || run.optString("event") != "pull_request") continue
+            if (run.optJSONObject("head_repository")?.optString("full_name") != repo) continue
+            val runId = run.optLong("id")
+            val number = run.optLong("run_number")
+            if (runId <= 0L || number <= installedVersionCode) continue
+            val artifacts = requestJson(
+                "https://api.github.com/repos/$repo/actions/runs/$runId/artifacts"
+            ).optJSONArray("artifacts") ?: continue
+            for (j in 0 until artifacts.length()) {
+                val artifact = artifacts.getJSONObject(j)
+                val name = artifact.optString("name")
+                if (artifact.optBoolean("expired") || !name.startsWith("$appName-PR-")) continue
+                val digest = artifact.optString("digest").removePrefix("sha256:").lowercase()
+                if (digest.length != 64 || !digest.all { it in '0'..'9' || it in 'a'..'f' }) continue
+                return@withContext Release(
+                    tag = "experimental-$runId",
+                    versionName = "Experimental #$number",
+                    versionCode = number,
+                    notes = listOf("Successful pull request build #$number", "Experimental — not a stable release"),
+                    apkUrl = "https://nightly.link/$repo/actions/runs/$runId/$name.zip",
+                    apkName = "$appName-experimental-$runId.apk",
+                    apkSize = 0L,
+                    sha256 = null,
+                    pageUrl = run.optString("html_url"),
+                    experimental = true,
+                    archiveSha256 = digest,
+                )
+            }
+        }
+        null
+    }
+
     /** Same rule as the build: "1.8" -> 18, "2.0" -> 20. */
     private fun versionCodeFromName(name: String): Long? {
         val m = Regex("""^(\d+)\.(\d)$""").find(name.trim()) ?: return null
