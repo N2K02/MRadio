@@ -456,7 +456,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                 Column(Modifier.navigationBarsPadding()) {
-                    if (homeTab != "All stations" && current != null) {
+                    if (homeTab == "Search" && current != null) {
                         NowPlayingBar(
                             station = current,
                             player = player,
@@ -482,16 +482,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             alwaysShowLabel = true,
                         )
                         NavigationBarItem(
-                            selected = homeTab == "Favorites" && !settingsMenu,
-                            onClick = { homeTab = "Favorites"; query = ""; settingsMenu = false },
-                            icon = {
-                                Icon(
-                                    if (homeTab == "Favorites" && !settingsMenu) Icons.Rounded.Favorite
-                                    else Icons.Rounded.FavoriteBorder,
-                                    contentDescription = null,
-                                )
-                            },
-                            label = { Text("Favorites") },
+                            selected = homeTab == "Search" && !settingsMenu,
+                            onClick = { homeTab = "Search"; settingsMenu = false },
+                            icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                            label = { Text("Search") },
                             alwaysShowLabel = true,
                         )
                         NavigationBarItem(
@@ -603,7 +597,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
                 item(key = "station-controls") {
                     Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                        if (homeTab == "All stations") {
+                        if (homeTab == "Search") {
                             TextField(
                                 value = query,
                                 onValueChange = { query = it },
@@ -621,12 +615,12 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                 keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
                             )
                         }
-                        if (homeTab == "All stations") PlaceChips(
+                        if (homeTab == "Search") PlaceChips(
                             place = place,
                             onPlace = ::choosePlace,
                             onPickCountry = { pickCountry = true },
                         )
-                        if (homeTab == "All stations") {
+                        if (homeTab == "Search") {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -681,16 +675,16 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     }
                 }
 
-                if (homeTab == "Favorites" && query.isBlank()) {
+                if (homeTab == "All stations") {
                     header(
-                        "Favorites",
+                        "Favourite Radios",
                         action = if (myList.size > 1) {
                             { TextButton(onClick = { arranging = !arranging }) {
                                 Text(if (arranging) "Done" else "Reorder")
                             } }
                         } else null,
                     )
-                    if (visibleMine.isEmpty()) message("No favorites yet. Add stations from Home.")
+                    if (visibleMine.isEmpty()) message("No favorites yet. Find stations in Search and add them here.")
                     items(visibleMine, key = { "favorites-" + it.id }) {
                         StationItem(it, true, visibleMine, Modifier.animateItem())
                     }
