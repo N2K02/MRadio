@@ -384,6 +384,88 @@ object AppUpdater {
         }
     }
 
+    /** Download a successful run ZIP, check GitHub's checksum, and extract its single signed APK. */
+    private suspend fun downloadExperimental(release: Release, apk: File) = withContext(Dispatchers.IO) {
+        updateDir().mkdirs()
+        updateDir().listFiles()?.filter { it != apk }?.forEach { it.delete() }
+        val zip = File(updateDir(), "experimental.zip")
+        val tmp = File(updateDir(), "experimental.part")
+        val expected = release.archiveSha256 ?: throw IOException("Missing artifact checksum")
+        try {
+            _state.value = State.Downloading(release, null)
+            var url = URL(release.apkUrl)
+            var redirects = 0
+            while (true) {
+                if (url.protocol != "https") throw IOException("Insecure artifact URL")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = false
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 45_000
+                connection.setRequestProperty("User-Agent", "$appName-updater (Android)")
+                val status = connection.responseCode
+                if (status in 300..399 && redirects++ < 6) {
+                    url = URL(url, connection.getHeaderField("Location") ?: throw IOException("Missing redirect URL"))
+                    connection.disconnect()
+                    continue
+                }
+                if (status != 200) throw httpError(connection, status)
+                try {
+                    val md = MessageDigest.getInstance("SHA-256")
+                    val total = connection.contentLengthLong
+                    var received = 0L
+                    connection.inputStream.use { input ->
+                        tmp.outputStream().use { output ->
+                            val bytes = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = input.read(bytes)
+                                if (n < 0) break
+                                received += n
+                                if (received > 250L * 1024 * 1024) throw IOException("Artifact too large")
+                                md.update(bytes, 0, n)
+                                output.write(bytes, 0, n)
+                                if (total > 0L) _state.value = State.Downloading(
+                                    release, (received.toFloat() / total).coerceIn(0f, 1f)
+                                )
+                            }
+                        }
+                    }
+                    if (md.digest().joinToString("") { "%02x".format(it) } != expected)
+                        throw IOException("GitHub artifact SHA-256 checksum mismatch")
+                } finally {
+                    connection.disconnect()
+                }
+                break
+            }
+            if (!tmp.renameTo(zip)) throw IOException("Cannot save artifact")
+            var found = false
+            ZipInputStream(zip.inputStream().buffered()).use { input ->
+                while (true) {
+                    val entry = input.nextEntry ?: break
+                    if (!entry.isDirectory && entry.name.endsWith(".apk", ignoreCase = true)) {
+                        if (found) throw IOException("More than one APK in workflow artifact")
+                        found = true
+                        var count = 0L
+                        apk.outputStream().use { output ->
+                            val bytes = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = input.read(bytes)
+                                if (n < 0) break
+                                count += n
+                                if (count > 200L * 1024 * 1024) throw IOException("APK too large")
+                                output.write(bytes, 0, n)
+                            }
+                        }
+                    }
+                    input.closeEntry()
+                }
+            }
+            if (!found) throw IOException("Workflow artifact contains no APK")
+        } finally {
+            tmp.delete()
+            zip.delete()
+        }
+    }
+
     /** Null if the APK is good to install, else what's wrong (in plain words). */
     private suspend fun verify(file: File, release: Release): String? = withContext(Dispatchers.IO) {
         if (release.apkSize > 0 && file.length() != release.apkSize) return@withContext "The download was incomplete. Please try again."
@@ -393,6 +475,8 @@ object AppUpdater {
         val apk = archiveInfo(file) ?: return@withContext "The downloaded file isn't a valid app."
         if (apk.packageName != app.packageName) return@withContext "The downloaded file is a different app."
         if (versionCodeOf(apk) <= installedVersionCode) return@withContext "The downloaded version isn't newer than this one."
+        if (release.experimental && versionCodeOf(apk) != release.versionCode)
+            return@withContext "Artifact APK version does not match the successful workflow run."
         val mine = signerDigests(packageInfo(app.packageName, signatures = true))
         val theirs = signerDigests(apk)
         if (mine.isEmpty() || theirs.isEmpty() || mine.intersect(theirs).isEmpty()) {
