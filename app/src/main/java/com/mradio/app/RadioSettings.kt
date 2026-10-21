@@ -39,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -169,7 +170,8 @@ fun RadioSettings(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text(page) },
+                        title = { Text(if (page == "Settings") "Settings" else page) },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                         navigationIcon = {
                             IconButton(onClick = ::back) {
                                 Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
@@ -184,10 +186,17 @@ fun RadioSettings(
                     label = "Settings navigation",
                 ) { current ->
                     Column(
-                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.Dp(4f)),
+                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         if (current == "Settings") {
+                            Text(
+                                "Make listening your own",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 16.dp, top = 6.dp, bottom = 12.dp),
+                            )
                             ListItem(
                                 headlineContent = { Text("Playback & audio") },
                                 supportingContent = { Text("Auto-play and equalizer") },
