@@ -523,7 +523,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                 Column(Modifier.navigationBarsPadding()) {
-                    if (homeTab == "Search" && current != null) {
+                    if ((homeTab == "Search" || settingsMenu) && current != null) {
                         NowPlayingBar(
                             station = current,
                             player = player,
