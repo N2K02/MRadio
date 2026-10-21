@@ -38,6 +38,7 @@ class RadioWidgetProvider : AppWidgetProvider() {
             handler.postDelayed(finish, 8_000L)
             runCatching {
                 withController(context) { controller ->
+                if (finished.get()) return@withController
                 try {
                     if (controller != null) {
                         when (intent.action) {
