@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -69,6 +70,7 @@ import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
@@ -384,6 +386,27 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             isPinned = station.id in pinned,
             onPin = if (inMineSection) ({ Library.togglePinned(station.id) }) else null,
             onInfo = { infoFor = station },
+            onShare = {
+                val stream = Library.orderedStreams(station).firstOrNull {
+                    it.startsWith("https://", ignoreCase = true) ||
+                        it.startsWith("http://", ignoreCase = true)
+                }
+                val description = buildString {
+                    append(station.name)
+                    if (station.tags.isNotBlank()) append(" · ").append(station.subtitle)
+                    if (stream != null) append("\n").append(stream)
+                }
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, station.name)
+                    putExtra(Intent.EXTRA_TEXT, description)
+                }
+                runCatching {
+                    context.startActivity(Intent.createChooser(intent, "Share station"))
+                }.onFailure {
+                    announce("No app available for sharing", null)
+                }
+            },
             onCopy = {
                 val url = Library.orderedStreams(station).firstOrNull()
                 if (url != null) {
@@ -1046,6 +1069,7 @@ private fun StationRow(
     onRemove: () -> Unit,
     onInfo: () -> Unit,
     onCopy: () -> Unit,
+    onShare: () -> Unit,
     isPinned: Boolean = false,
     onPin: (() -> Unit)? = null,
     onMoveUp: (() -> Unit)? = null,
@@ -1106,6 +1130,11 @@ private fun StationRow(
                                 leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
                             )
                         }
+                        DropdownMenuItem(
+                            text = { Text("Share station") },
+                            onClick = { menuOpen = false; onShare() },
+                            leadingIcon = { Icon(Icons.Rounded.Share, null) },
+                        )
                         DropdownMenuItem(
                             text = { Text("Copy stream URL") },
                             onClick = { menuOpen = false; onCopy() },
