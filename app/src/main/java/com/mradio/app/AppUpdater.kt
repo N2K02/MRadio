@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.zip.ZipInputStream
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,6 +64,8 @@ object AppUpdater {
         /** Lowercase hex, when GitHub provides it. */
         val sha256: String?,
         val pageUrl: String,
+        val experimental: Boolean = false,
+        val archiveSha256: String? = null,
     )
 
     sealed interface State {
@@ -82,11 +85,22 @@ object AppUpdater {
     val state: StateFlow<State> = _state
 
     private val prefs by lazy { app.getSharedPreferences("app_updater", Context.MODE_PRIVATE) }
+    private val _experimentalEnabled = MutableStateFlow(false)
+    val experimentalEnabled: StateFlow<Boolean> = _experimentalEnabled
+
+    fun setExperimentalEnabled(enabled: Boolean) {
+        _experimentalEnabled.value = enabled
+        prefs.edit().putBoolean("experimentalEnabled", enabled).apply()
+        dismiss()
+        check(manual = true)
+    }
 
     fun init(context: Context, repo: String, appName: String) {
         app = context.applicationContext
         this.repo = repo
         this.appName = appName
+        _experimentalEnabled.value = app.getSharedPreferences("app_updater", Context.MODE_PRIVATE)
+            .getBoolean("experimentalEnabled", false)
         if (context is Activity) activityRef = WeakReference(context)
         // A new app start: an update that installed (or was abandoned) leaves its APK behind.
         if (_state.value is State.Idle) runCatching { updateDir().deleteRecursively() }
@@ -116,7 +130,10 @@ object AppUpdater {
         if (job?.isActive == true) return
         job = scope.launch {
             _state.value = State.Checking
-            val result = runCatching { latestRelease() }
+            val result = runCatching {
+                val experimental = if (_experimentalEnabled.value) latestExperimental() else null
+                experimental?.takeIf { it.versionCode > installedVersionCode } ?: latestRelease()
+            }
             prefs.edit().putLong("lastCheck", System.currentTimeMillis()).apply()
             val release = result.getOrNull()
             _state.value = when {
@@ -146,7 +163,7 @@ object AppUpdater {
             val file = apkFile(release)
             try {
                 if (!(file.exists() && verify(file, release) == null)) {
-                    download(release, file)
+                    if (release.experimental) downloadExperimental(release, file) else download(release, file)
                     verify(file, release)?.let { problem ->
                         file.delete()
                         _state.value = State.Failed(problem, release, diagnostic(IllegalStateException(problem), release))
@@ -216,7 +233,10 @@ object AppUpdater {
             if (o.optBoolean("draft") || o.optBoolean("prerelease")) return@withContext null
             val tag = o.optString("tag_name")
             val name = tag.removePrefix("v")
-            val code = versionCodeFromName(name) ?: return@withContext null
+            val body = o.optString("body")
+            val code = Regex("""(?m)^Version code:\s*(\d+)""").find(body)
+                ?.groupValues?.get(1)?.toLongOrNull()
+                ?: versionCodeFromName(name) ?: return@withContext null
             val assets = o.optJSONArray("assets") ?: return@withContext null
             val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
                 .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) }
@@ -323,7 +343,7 @@ object AppUpdater {
         if (versionCodeOf(apk) <= installedVersionCode) return@withContext "The downloaded version isn't newer than this one."
         val mine = signerDigests(packageInfo(app.packageName, signatures = true))
         val theirs = signerDigests(apk)
-        if (mine.isNotEmpty() && theirs.isNotEmpty() && mine.intersect(theirs).isEmpty()) {
+        if (mine.isEmpty() || theirs.isEmpty() || mine.intersect(theirs).isEmpty()) {
             return@withContext "This update is signed with a different key, so Android can't install it over the current app."
         }
         null
