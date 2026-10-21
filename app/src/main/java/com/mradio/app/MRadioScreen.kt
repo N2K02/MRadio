@@ -451,6 +451,62 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
+            topBar = {
+                Surface(color = MaterialTheme.colorScheme.surface) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().statusBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                when {
+                                    settingsMenu -> Icons.Rounded.Settings
+                                    homeTab == "Search" -> Icons.Rounded.Search
+                                    else -> Icons.Rounded.Home
+                                },
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Text(
+                                when {
+                                    settingsMenu -> "Settings"
+                                    homeTab == "Search" -> "Search"
+                                    else -> "Home"
+                                },
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    android.widget.ImageView(ctx).apply {
+                                        setImageDrawable(ctx.packageManager.getApplicationIcon(ctx.packageName))
+                                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                                        contentDescription = null
+                                    }
+                                },
+                                modifier = Modifier.size(28.dp),
+                            )
+                            Text(
+                                "mRadio",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            },
             bottomBar = {
                 // Keep the bar and gesture-navigation inset opaque, so station cards never
                 // show through the controls on edge-to-edge Android layouts.
@@ -511,56 +567,33 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 }
             },
         ) { padding ->
-            LazyColumn(
+            if (settingsMenu) {
+        RadioSettings(
+            versionDescription = when (val u = updateState) {
+                is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
+                is AppUpdater.State.Checking -> "Checking…"
+                is AppUpdater.State.Downloading -> "Downloading…"
+                is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
+                is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
+                else -> "Installed v${AppUpdater.installedVersionName}"
+            },
+            onEqualizer = {
+                settingsMenu = false
+                equalizerOpen = true
+            },
+            onCheckUpdates = {
+                if (updateState is AppUpdater.State.Idle ||
+                    updateState is AppUpdater.State.UpToDate ||
+                    updateState is AppUpdater.State.Failed
+                ) AppUpdater.check(manual = true)
+            },
+            onDismiss = { settingsMenu = false },
+        )
+    }
+            else LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
             ) {
-                item(key = "home-head") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            AndroidView(
-                                factory = { ctx ->
-                                    android.widget.ImageView(ctx).apply {
-                                        setImageDrawable(ctx.packageManager.getApplicationIcon(ctx.packageName))
-                                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                                        contentDescription = null
-                                    }
-                                },
-                                modifier = Modifier.size(30.dp),
-                            )
-                            Spacer(Modifier.width(7.dp))
-                            Text(
-                                "mRadio",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Icon(
-                                if (homeTab == "Search") Icons.Rounded.Search else Icons.Rounded.Home,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp),
-                            )
-                            Text(
-                                if (homeTab == "Search") "Search" else "Home",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
-                }
                 if (homeTab == "All stations") {
                     item(key = "home-player") {
                         Surface(
@@ -819,29 +852,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         }
     }
 
-    if (settingsMenu) {
-        RadioSettings(
-            versionDescription = when (val u = updateState) {
-                is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
-                is AppUpdater.State.Checking -> "Checking…"
-                is AppUpdater.State.Downloading -> "Downloading…"
-                is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
-                is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
-                else -> "Installed v${AppUpdater.installedVersionName}"
-            },
-            onEqualizer = {
-                settingsMenu = false
-                equalizerOpen = true
-            },
-            onCheckUpdates = {
-                if (updateState is AppUpdater.State.Idle ||
-                    updateState is AppUpdater.State.UpToDate ||
-                    updateState is AppUpdater.State.Failed
-                ) AppUpdater.check(manual = true)
-            },
-            onDismiss = { settingsMenu = false },
-        )
-    }
 
     if (equalizerOpen) EqualizerSheet(onDismiss = { equalizerOpen = false })
 
