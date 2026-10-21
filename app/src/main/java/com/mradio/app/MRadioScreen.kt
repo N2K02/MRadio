@@ -539,48 +539,26 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     }
 
     if (settingsMenu) {
-        AlertDialog(
-            onDismissRequest = { settingsMenu = false },
-            title = { Text("Settings") },
-            text = {
-                Column {
-                    ListItem(
-                        headlineContent = { Text("Playback & audio") },
-                        supportingContent = { Text("Equalizer and sound controls") },
-                        leadingContent = { Icon(Icons.Rounded.GraphicEq, contentDescription = null) },
-                        modifier = Modifier.clickable {
-                            settingsMenu = false
-                            equalizerOpen = true
-                        },
-                    )
-                    ListItem(
-                        headlineContent = { Text("About & updates") },
-                        supportingContent = {
-                            Text(
-                                when (val u = updateState) {
-                                    is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
-                                    is AppUpdater.State.Checking -> "Checking…"
-                                    is AppUpdater.State.Downloading -> "Downloading…"
-                                    is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
-                                    is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
-                                    else -> "Installed v${AppUpdater.installedVersionName}"
-                                },
-                            )
-                        },
-                        leadingContent = { Icon(Icons.Rounded.SystemUpdate, contentDescription = null) },
-                        modifier = Modifier.clickable {
-                            settingsMenu = false
-                            if (updateState is AppUpdater.State.Idle ||
-                                updateState is AppUpdater.State.UpToDate ||
-                                updateState is AppUpdater.State.Failed
-                            ) AppUpdater.check(manual = true)
-                        },
-                    )
-                }
+        RadioSettings(
+            versionDescription = when (val u = updateState) {
+                is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
+                is AppUpdater.State.Checking -> "Checking…"
+                is AppUpdater.State.Downloading -> "Downloading…"
+                is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
+                is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
+                else -> "Installed v${AppUpdater.installedVersionName}"
             },
-            confirmButton = {
-                TextButton(onClick = { settingsMenu = false }) { Text("Close") }
+            onEqualizer = {
+                settingsMenu = false
+                equalizerOpen = true
             },
+            onCheckUpdates = {
+                if (updateState is AppUpdater.State.Idle ||
+                    updateState is AppUpdater.State.UpToDate ||
+                    updateState is AppUpdater.State.Failed
+                ) AppUpdater.check(manual = true)
+            },
+            onDismiss = { settingsMenu = false },
         )
     }
 
