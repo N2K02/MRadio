@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +56,7 @@ fun RadioSettings(
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
     val experimentalEnabled by AppUpdater.experimentalEnabled.collectAsState()
     val playbackEvents by Library.events.collectAsState()
+    val listeningStats by Library.listeningStats.collectAsState()
     var page by rememberSaveable { mutableStateOf("Settings") }
     fun back() {
         if (page == "Settings") onDismiss() else page = "Settings"
@@ -93,6 +95,12 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { page = "Playback & audio" },
                             )
+                            ListItem(
+                                headlineContent = { Text("Listening statistics") },
+                                supportingContent = { Text("Time listened and estimated Wi-Fi / mobile streaming") },
+                                leadingContent = { Icon(Icons.Rounded.BarChart, null) },
+                                modifier = Modifier.clickable { page = "Listening statistics" },
+                            )
                             HorizontalDivider()
                             ListItem(
                                 headlineContent = { Text("About & updates") },
@@ -123,6 +131,46 @@ fun RadioSettings(
                                 supportingContent = { Text("Adjust sound settings") },
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { onEqualizer() },
+                            )
+                        } else if (current == "Listening statistics") {
+                            val hours = listeningStats.listeningMs / 3_600_000L
+                            val minutes = (listeningStats.listeningMs / 60_000L) % 60L
+                            fun usage(bytes: Long): String = String.format(java.util.Locale.US, "%.1f MB", bytes / 1_000_000.0)
+                            ListItem(
+                                headlineContent = { Text("Listening time") },
+                                supportingContent = { Text("${hours}h ${minutes}m") },
+                            )
+                            HorizontalDivider()
+                            ListItem(
+                                headlineContent = { Text("Wi-Fi · estimated") },
+                                supportingContent = { Text(usage(listeningStats.wifiEstimatedBytes)) },
+                            )
+                            ListItem(
+                                headlineContent = { Text("Mobile data · estimated") },
+                                supportingContent = { Text(usage(listeningStats.mobileEstimatedBytes)) },
+                            )
+                            ListItem(
+                                headlineContent = { Text("Other or unidentified network · estimated") },
+                                supportingContent = { Text(usage(listeningStats.unknownNetworkEstimatedBytes)) },
+                            )
+                            ListItem(
+                                headlineContent = { Text("How this is calculated") },
+                                supportingContent = {
+                                    Text("Listening time counts active playback only. Network use is estimated from the reported stream bitrate, not measured bytes. When the station does not report a bitrate, its consumption is excluded. Buffering, artwork, searches, and HTTP overhead are not counted.")
+                                },
+                            )
+                            if (listeningStats.unestimatedMs > 0L) {
+                                ListItem(
+                                    headlineContent = { Text("Playback with unknown bitrate") },
+                                    supportingContent = { Text("${listeningStats.unestimatedMs / 60_000L} minutes not included in data estimates") },
+                                )
+                            }
+                            ListItem(
+                                headlineContent = { Text("Reset listening statistics") },
+                                supportingContent = { Text("Clear stored time and usage estimates") },
+                                trailingContent = {
+                                    TextButton(onClick = Library::clearListeningStats) { Text("Reset") }
+                                },
                             )
                         } else if (current == "Diagnostics") {
                             ListItem(
