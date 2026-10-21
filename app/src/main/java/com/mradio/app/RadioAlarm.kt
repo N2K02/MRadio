@@ -106,8 +106,15 @@ object RadioAlarm {
 class RadioAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != RadioAlarm.ACTION_PLAY_ALARM) return
-        val station = RadioAlarm.consume(context) ?: return
-        if (Library.find(station) == null) return
+        val station = RadioAlarm.consume(context)
+        if (station == null) {
+            Library.logPlayback("Radio alarm fired without a saved station")
+            return
+        }
+        if (Library.find(station) == null) {
+            Library.logPlayback("Radio alarm station no longer exists")
+            return
+        }
         runCatching {
             ContextCompat.startForegroundService(
                 context,
