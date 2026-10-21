@@ -47,9 +47,17 @@ object RadioAlarm {
             return
         }
         _alarmAt.value = whenMillis
-        if (canSchedule(context) && Library.find(station) != null) {
+        if (Library.stations.value.none { it.id == station }) {
+            store.edit().clear().apply()
+            _alarmAt.value = null
+            Library.logPlayback("Radio alarm cancelled: saved station no longer available")
+            return
+        }
+        if (canSchedule(context)) {
             runCatching { schedule(context, whenMillis, station) }
                 .onFailure { Library.logPlayback("Radio alarm reschedule failed: ${it.javaClass.simpleName}") }
+        } else {
+            Library.logPlayback("Radio alarm needs exact-alarm permission to be restored")
         }
     }
 
@@ -74,7 +82,9 @@ object RadioAlarm {
 
     fun schedule(context: Context, atMillis: Long, stationId: String) {
         require(atMillis > System.currentTimeMillis()) { "Choose a future alarm time" }
-        require(Library.find(stationId) != null) { "Choose a saved station" }
+        require(Library.stations.value.any { it.id == stationId && it.streams.isNotEmpty() }) {
+            "Choose a saved station with a stream URL"
+        }
         check(canSchedule(context)) { "Allow exact alarms in Android settings first" }
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val show = PendingIntent.getActivity(
@@ -111,7 +121,7 @@ class RadioAlarmReceiver : BroadcastReceiver() {
             Library.logPlayback("Radio alarm fired without a saved station")
             return
         }
-        if (Library.find(station) == null) {
+        if (Library.stations.value.none { it.id == station }) {
             Library.logPlayback("Radio alarm station no longer exists")
             return
         }
