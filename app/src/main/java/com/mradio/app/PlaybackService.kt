@@ -74,7 +74,6 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var session: MediaLibrarySession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val searchResults = HashMap<String, List<Station>>()
-    private var autoStartedForCar = false
 
     // Fallback state for the station being played.
     private var current: Station? = null
@@ -647,31 +646,6 @@ class PlaybackService : MediaLibraryService() {
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<MediaItem>> {
-            // Android Auto's projected media browser uses the Gearhead package.
-            // Do not auto-start for ordinary phone media browsers or repeated root requests.
-            if (browser.packageName == "com.google.android.projection.gearhead" &&
-                Library.autoPlayAuto.value && !autoStartedForCar &&
-                player.playbackState == Player.STATE_IDLE && player.mediaItemCount == 0 &&
-                current == null && !player.playWhenReady
-            ) {
-                val station = Library.lastPlayed?.let(Library::find)
-                    ?: Library.myStations().firstOrNull()
-                if (station != null) {
-                    autoStartedForCar = true
-                    scope.launch {
-                        // The phone may have started playback after the browser request.
-                        // Never replace a station that was selected in the meantime.
-                        if (player.mediaItemCount == 0 && current == null &&
-                            player.playbackState == Player.STATE_IDLE && !player.playWhenReady &&
-                            Library.autoPlayAuto.value
-                        ) {
-                            player.setMediaItem(startStation(station))
-                            player.prepare()
-                            player.play()
-                        }
-                    }
-                }
-            }
             val extras = Bundle().apply {
                 putBoolean(CONTENT_STYLE_SUPPORTED, true)
                 putInt(CONTENT_STYLE_BROWSABLE_HINT, CONTENT_STYLE_LIST)
@@ -785,9 +759,13 @@ class PlaybackService : MediaLibraryService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = future {
+            // Android Auto and the system decide when to request resumption.
+            // A browser connection alone must never start audio.
             val station = Library.lastPlayed?.let { resolve(it) }
-                ?: Library.myStations().firstOrNull() ?: Library.stations.value.first()
-            MediaSession.MediaItemsWithStartPosition(listOf(startStation(station)), 0, C.TIME_UNSET)
+                ?: Library.myStations().firstOrNull()
+                ?: Library.stations.value.firstOrNull()
+            val items = if (station != null) listOf(startStation(station)) else emptyList()
+            MediaSession.MediaItemsWithStartPosition(items, 0, C.TIME_UNSET)
         }
     }
 
