@@ -327,7 +327,7 @@ class PlaybackService : MediaLibraryService() {
         CommandButton.Builder(CommandButton.ICON_NEXT)
             .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
             .setDisplayName("Next station")
-            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .setSlots(CommandButton.SLOT_FORWARD)
             .build(),
         current?.takeIf { !Library.inMine(it) }?.let {
             CommandButton.Builder(CommandButton.ICON_HEART_UNFILLED)
@@ -341,7 +341,7 @@ class PlaybackService : MediaLibraryService() {
             .setCustomIconResId(R.drawable.ic_exit)
             .setSessionCommand(StationCommands.EXIT)
             .setDisplayName("Quit radio")
-            .setSlots(CommandButton.SLOT_FORWARD)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
             .build(),
     )
 
