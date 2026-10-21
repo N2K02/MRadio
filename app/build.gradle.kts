@@ -7,7 +7,9 @@ plugins {
 // local builds default to 1.0.
 val appVersion = (findProperty("appVersion") as String?) ?: "1.0"
 require(Regex("""\d+\.\d""").matches(appVersion)) { "appVersion must look like 1.0, got $appVersion" }
-val appVersionCode = appVersion.split(".").let { (major, minor) -> major.toInt() * 10 + minor.toInt() }
+val appVersionCode = (findProperty("appVersionCode") as String?)?.toIntOrNull()
+    ?: appVersion.split(".").let { (major, minor) -> major.toInt() * 10 + minor.toInt() }
+val appVersionSuffix = (findProperty("appVersionSuffix") as String?) ?: ""
 
 android {
     namespace = "com.mradio.app"
@@ -18,7 +20,7 @@ android {
         minSdk = 26
         targetSdk = 35
         // One decimal place: 1.0, 1.1 … 1.9, 2.0. versionCode 1.4 -> 14 (always goes up).
-        versionName = appVersion
+        versionName = appVersion + appVersionSuffix
         versionCode = appVersionCode
     }
 
