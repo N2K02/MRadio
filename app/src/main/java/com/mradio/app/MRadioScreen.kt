@@ -387,6 +387,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             station = station,
             isCurrent = player.mediaId == station.id,
             isPlaying = player.mediaId == station.id && player.isPlaying,
+            isPlayRequested = player.mediaId == station.id && player.playWhenReady,
             inMineSection = inMineSection,
             isMine = isMine,
             isBroken = station.id in broken,
@@ -1175,6 +1176,7 @@ private fun StationRow(
     station: Station,
     isCurrent: Boolean,
     isPlaying: Boolean,
+    isPlayRequested: Boolean,
     inMineSection: Boolean,
     isMine: Boolean,
     isBroken: Boolean,
@@ -1222,8 +1224,8 @@ private fun StationRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
                     Icon(
-                        if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause ${station.name}" else "Play ${station.name}",
+                        if (isPlayRequested) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlayRequested) "Pause ${station.name}" else "Play ${station.name}",
                     )
                 }
                 var menuOpen by remember { mutableStateOf(false) }
