@@ -51,6 +51,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -201,6 +202,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val focus = LocalFocusManager.current
 
     var query by rememberSaveable { mutableStateOf("") }
+    var homeTab by rememberSaveable { mutableStateOf("All stations") }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
     var place by rememberSaveable { mutableStateOf(Library.place) }
     var pickCountry by remember { mutableStateOf(false) }
     var playerOpen by rememberSaveable { mutableStateOf(false) }
@@ -363,27 +366,31 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-              // Keeps the player clear of the navigation keys / gesture bar.
-              Column(Modifier.navigationBarsPadding()) {
-                AnimatedVisibility(
-                    visible = current != null && !playerOpen,
-                    enter = slideInVertically { it },
-                    exit = slideOutVertically { it },
+                Row(
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    current?.let { station ->
-                        NowPlayingBar(
-                            station = station,
-                            player = player,
-                            isMine = station.id in mine || Library.inMine(station),
-                            onOpen = { playerOpen = true },
-                            onHeart = { addToMine(station) },
-                            onPlayPause = { if (player.failed) retry(station) else playOrPause(station, emptyList()) },
-                            onPrevious = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
-                            onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
-                        )
+                    TextButton(onClick = { homeTab = "All stations"; query = "" }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Rounded.Home, contentDescription = null)
+                            Text("Home", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    TextButton(onClick = { homeTab = "Favorites"; query = "" }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Rounded.FavoriteBorder, contentDescription = null)
+                            Text("Favorites", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    TextButton(onClick = { settingsMenu = true }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Rounded.Settings, contentDescription = null)
+                            Text("Settings", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
-              }
             },
         ) { padding ->
             LazyColumn(
