@@ -595,9 +595,15 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     }
                 }
 
-                item(key = "station-controls") {
+                if (homeTab == "Search") item(key = "station-controls") {
                     Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                        if (homeTab == "Search") {
+                        Text(
+                            "Find stations",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                        )
+                        if (true) {
                             TextField(
                                 value = query,
                                 onValueChange = { query = it },
