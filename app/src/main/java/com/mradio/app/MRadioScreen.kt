@@ -603,8 +603,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
                         )
-                        if (true) {
-                            TextField(
+                        TextField(
                                 value = query,
                                 onValueChange = { query = it },
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -620,13 +619,12 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
                             )
-                        }
-                        if (homeTab == "Search") PlaceChips(
+                        PlaceChips(
                             place = place,
                             onPlace = ::choosePlace,
                             onPickCountry = { pickCountry = true },
                         )
-                        if (homeTab == "Search") {
+                        if (true) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
