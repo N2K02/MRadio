@@ -676,7 +676,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         }
                     }
                 }
-                if (homeTab == "All stations") item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
 
                 if (homeTab == "Favorites" && query.isBlank()) {
                     header("Favorites")
