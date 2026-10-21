@@ -15,6 +15,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -1076,14 +1077,19 @@ private fun NowPlayingBar(
                     }
                     androidx.compose.animation.AnimatedContent(
                         targetState = statusText(station, player, station.id in broken),
+                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
                         label = "Playback status",
-                    ) { status -> Text(
-                        status,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (player.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    ) }
+                        modifier = Modifier.weight(1f),
+                    ) { status ->
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (player.failed) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             if (!isMine) {
