@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -17,6 +18,7 @@ class MainActivity : ComponentActivity() {
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private val controller = mutableStateOf<MediaController?>(null)
+    private var autoPlayedThisLaunch = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,7 +51,22 @@ class MainActivity : ComponentActivity() {
         val future = MediaController.Builder(this, token).buildAsync()
         controllerFuture = future
         future.addListener(
-            { controller.value = runCatching { future.get() }.getOrNull() },
+            {
+                val connected = runCatching { future.get() }.getOrNull()
+                controller.value = connected
+                if (!autoPlayedThisLaunch && Library.autoPlayPhone.value && connected != null &&
+                    connected.playbackState == androidx.media3.common.Player.STATE_IDLE &&
+                    connected.mediaItemCount == 0
+                ) {
+                    val station = Library.lastPlayed?.let(Library::find)
+                    if (station != null) {
+                        autoPlayedThisLaunch = true
+                        connected.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
+                        connected.prepare()
+                        connected.play()
+                    }
+                }
+            },
             ContextCompat.getMainExecutor(this),
         )
     }
