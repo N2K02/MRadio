@@ -397,65 +397,131 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
             ) {
-                item {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(start = 24.dp, end = 16.dp, top = 16.dp),
-                    ) {
-                        Text(
-                            "MRadio",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Box {
-                            FilledTonalIconButton(onClick = { settingsMenu = true }) {
+                item(key = "home-head") {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "mRadio",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
+                                Icon(Icons.Rounded.Search, contentDescription = "Search stations")
+                            }
+                            IconButton(onClick = { settingsMenu = true }) {
                                 Icon(Icons.Rounded.Settings, contentDescription = "Settings")
                             }
-                            // Settings opens a dedicated, expandable dialog rather than a cramped menu.
-
                         }
-                        Spacer(Modifier.width(8.dp))
-                        FilledTonalIconButton(onClick = onExit) {
-                            Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Exit")
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf("All stations", "Favorites", "Recent").forEach { tab ->
+                                FilterChip(
+                                    selected = homeTab == tab,
+                                    onClick = { homeTab = tab; query = "" },
+                                    label = { Text(tab) },
+                                )
+                            }
                         }
+                        if (showSearch) {
+                            TextField(
+                                value = query,
+                                onValueChange = { query = it },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                placeholder = { Text("Find a station") },
+                                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                                trailingIcon = {
+                                    if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
+                                        Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                                    }
+                                },
+                                singleLine = true,
+                                shape = CircleShape,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+                            )
+                        }
+                        if (homeTab == "All stations") PlaceChips(
+                            place = place,
+                            onPlace = ::choosePlace,
+                            onPickCountry = { pickCountry = true },
+                        )
                     }
-                    Text(
-                        "Radio from Mauritius and all around the world",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-                    )
-                    TextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        placeholder = { Text("Search stations or find new ones") },
-                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (query.isNotEmpty()) {
-                                IconButton(onClick = { query = "" }) {
-                                    Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                }
+                if (homeTab == "All stations" && query.isBlank()) {
+                    item(key = "home-player") {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            onClick = { if (current != null) playerOpen = true },
+                        ) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 58)
+                                    else Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null)
+                                    }
+                                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                        Text(if (player.isPlaying) "● LIVE" else "NOW PLAYING",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.labelSmall)
+                                        Text(current?.name ?: "Choose a station",
+                                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            if (current == null) "Select a radio below" else statusText(current, player, currentBroken),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (current != null) IconButton(onClick = {
+                                        if (Library.inMine(current)) removeFromMine(current) else addToMine(current)
+                                    }) {
+                                        Icon(
+                                            if (Library.inMine(current)) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                            contentDescription = "Toggle favorite",
+                                        )
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
+                                        enabled = current != null) {
+                                        Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous station")
+                                    }
+                                    FilledIconButton(
+                                        onClick = {
+                                            if (current != null) {
+                                                if (player.failed) retry(current) else playOrPause(current, emptyList())
+                                            } else myList.firstOrNull()?.let { playOrPause(it, myList) }
+                                        },
+                                        modifier = Modifier.size(52.dp),
+                                        enabled = controller != null,
+                                    ) {
+                                        Icon(
+                                            if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                            contentDescription = if (player.isPlaying) "Pause radio" else "Play radio",
+                                        )
+                                    }
+                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
+                                        enabled = current != null) {
+                                        Icon(Icons.Rounded.SkipNext, contentDescription = "Next station")
+                                    }
                                 }
                             }
-                        },
-                        singleLine = true,
-                        shape = CircleShape,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                        ),
-                    )
-                    PlaceChips(
-                        place = place,
-                        onPlace = ::choosePlace,
-                        onPickCountry = { pickCountry = true },
-                    )
+                        }
+                    }
                 }
                 item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
 
