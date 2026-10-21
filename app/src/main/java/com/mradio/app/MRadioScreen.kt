@@ -621,7 +621,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(22.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
                             onClick = { if (current != null) playerOpen = true },
                         ) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -631,7 +631,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         Icon(Icons.Rounded.GraphicEq, contentDescription = null)
                                     }
                                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                        Text(if (player.isPlaying) "● LIVE" else "NOW PLAYING",
+                                        Text(if (player.isPlaying) "● LIVE RADIO" else "NOW PLAYING",
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.labelSmall)
                                         Text(current?.name ?: "Choose a station",
@@ -672,8 +672,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         enabled = controller != null,
                                     ) {
                                         Icon(
-                                            if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                            contentDescription = if (player.isPlaying) "Pause radio" else "Play radio",
+                                            if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                            contentDescription = if (player.playWhenReady) "Pause radio" else "Play radio",
                                         )
                                     }
                                     IconButton(onClick = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
@@ -1359,7 +1359,7 @@ private fun NowPlayingBar(
     val barColor by animateColorAsState(
         targetValue = if (player.failed) MaterialTheme.colorScheme.errorContainer
             else if (player.isPlaying) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerHigh,
+            else MaterialTheme.colorScheme.surfaceContainer,
         animationSpec = tween(240),
         label = "Mini-player background",
     )
