@@ -134,6 +134,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1417,22 +1419,29 @@ private fun NowPlayingBar(
     onNext: () -> Unit,
 ) {
     val broken by Library.broken.collectAsState()
-    val barColor by animateColorAsState(
-        targetValue = if (player.failed) MaterialTheme.colorScheme.errorContainer
-            else if (player.isPlaying) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceContainer,
-        animationSpec = tween(240),
-        label = "Mini-player background",
-    )
+    val indicatorColor = when {
+        player.failed || station.id in broken -> Color(0xFFEF5350)
+        player.isPlaying -> Color(0xFF4CAF50)
+        else -> Color(0xFFFFA726)
+    }
+    val indicatorLabel = when {
+        player.failed || station.id in broken -> "Playback error"
+        player.isPlaying -> "Playing"
+        else -> "Paused"
+    }
     Surface(
-        color = barColor,
-        shape = RoundedCornerShape(20.dp),
-        tonalElevation = 0.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(26.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        ),
+        shadowElevation = 8.dp,
+        tonalElevation = 2.dp,
         onClick = onOpen,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    )    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
@@ -1451,14 +1460,13 @@ private fun NowPlayingBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (player.failed) {
-                        Icon(
-                            Icons.Rounded.ErrorOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp).padding(end = 4.dp),
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(9.dp)
+                            .background(indicatorColor, CircleShape)
+                            .semantics { contentDescription = indicatorLabel },
+                    )
                     androidx.compose.animation.AnimatedContent(
                         targetState = statusText(station, player, station.id in broken),
                         transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
