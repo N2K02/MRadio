@@ -221,6 +221,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var pickCountry by remember { mutableStateOf(false) }
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     var infoFor by remember { mutableStateOf<Station?>(null) }
+    var confirmHideStation by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
     var settingsMenu by remember { mutableStateOf(false) }
     val updateState by AppUpdater.state.collectAsState()
@@ -809,14 +810,38 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             isMine = Library.inMine(station),
             failedAt = broken[station.id],
             onRemoveFromMine = { infoFor = null; removeFromMine(station) },
-            onRemoveCompletely = { infoFor = null; removeCompletely(station) },
+            onRemoveCompletely = { infoFor = null; confirmHideStation = station },
             onTryAgain = { infoFor = null; retry(station) },
             onSelectStream = { url ->
                 Library.setPreferredStream(station, url)
-                if (player.mediaId == station.id) retry(station)
+                if (player.mediaId == station.id) {
+                    val resume = player.isPlaying
+                    controller?.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
+                    controller?.prepare()
+                    if (resume) controller?.play()
+                }
                 announce(if (url == null) "Automatic stream selection" else "Preferred stream saved", null)
             },
             onDismiss = { infoFor = null },
+        )
+    }
+
+    confirmHideStation?.let { station ->
+        AlertDialog(
+            onDismissRequest = { confirmHideStation = null },
+            title = { Text("Remove ${station.name}?") },
+            text = {
+                Text("This hides the station from lists and search. You can restore it later in Removed stations.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmHideStation = null
+                    removeCompletely(station)
+                }) { Text("Remove") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmHideStation = null }) { Text("Cancel") }
+            },
         )
     }
 
