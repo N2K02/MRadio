@@ -1,6 +1,8 @@
 package com.mradio.app
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +19,8 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -34,9 +38,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
@@ -57,6 +63,32 @@ fun RadioSettings(
     val experimentalEnabled by AppUpdater.experimentalEnabled.collectAsState()
     val playbackEvents by Library.events.collectAsState()
     val listeningStats by Library.listeningStats.collectAsState()
+    val context = LocalContext.current
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            backupStatus = runCatching {
+                val json = Library.exportBackup()
+                context.contentResolver.openOutputStream(uri, "wt")?.use {
+                    it.write(json.toByteArray(Charsets.UTF_8))
+                } ?: error("Could not open destination file")
+                "Backup exported successfully"
+            }.getOrElse { "Export failed: ${it.message ?: "Unknown error"}" }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            backupStatus = runCatching {
+                val json = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val data = stream.readNBytes(1_000_001)
+                    require(data.size <= 1_000_000) { "Backup is too large" }
+                    String(data, Charsets.UTF_8)
+                } ?: error("Could not read backup file")
+                val count = Library.restoreBackup(json)
+                "Restored $count favorite stations and settings"
+            }.getOrElse { "Restore failed: ${it.message ?: "Invalid backup"}" }
+        }
+    }
     var page by rememberSaveable { mutableStateOf("Settings") }
     fun back() {
         if (page == "Settings") onDismiss() else page = "Settings"
@@ -101,6 +133,12 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.BarChart, null) },
                                 modifier = Modifier.clickable { page = "Listening statistics" },
                             )
+                            ListItem(
+                                headlineContent = { Text("Backup & restore") },
+                                supportingContent = { Text("Export or restore favorites, custom stations, and preferences") },
+                                leadingContent = { Icon(Icons.Rounded.Save, null) },
+                                modifier = Modifier.clickable { page = "Backup & restore" },
+                            )
                             HorizontalDivider()
                             ListItem(
                                 headlineContent = { Text("About & updates") },
@@ -132,6 +170,33 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { onEqualizer() },
                             )
+                        } else if (current == "Backup & restore") {
+                            ListItem(
+                                headlineContent = { Text("Export backup") },
+                                supportingContent = { Text("Save favorites, pinned stations, custom stations, and playback preferences to a JSON file") },
+                                leadingContent = { Icon(Icons.Rounded.Save, null) },
+                                modifier = Modifier.clickable {
+                                    backupStatus = null
+                                    exportLauncher.launch("mradio-backup.json")
+                                },
+                            )
+                            ListItem(
+                                headlineContent = { Text("Restore backup") },
+                                supportingContent = { Text("Replaces your current favorites and saved preferences. Export a copy first.") },
+                                leadingContent = { Icon(Icons.Rounded.Restore, null) },
+                                modifier = Modifier.clickable {
+                                    backupStatus = null
+                                    importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                                },
+                            )
+                            backupStatus?.let { message ->
+                                ListItem(
+                                    headlineContent = { Text(message) },
+                                    trailingContent = {
+                                        TextButton(onClick = { backupStatus = null }) { Text("Dismiss") }
+                                    },
+                                )
+                            }
                         } else if (current == "Listening statistics") {
                             val hours = listeningStats.listeningMs / 3_600_000L
                             val minutes = (listeningStats.listeningMs / 60_000L) % 60L
