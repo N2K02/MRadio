@@ -811,6 +811,11 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             onRemoveFromMine = { infoFor = null; removeFromMine(station) },
             onRemoveCompletely = { infoFor = null; removeCompletely(station) },
             onTryAgain = { infoFor = null; retry(station) },
+            onSelectStream = { url ->
+                Library.setPreferredStream(station, url)
+                if (player.mediaId == station.id) retry(station)
+                announce(if (url == null) "Automatic stream selection" else "Preferred stream saved", null)
+            },
             onDismiss = { infoFor = null },
         )
     }
@@ -917,9 +922,12 @@ private fun StationInfoDialog(
     onRemoveFromMine: () -> Unit,
     onRemoveCompletely: () -> Unit,
     onTryAgain: () -> Unit,
+    onSelectStream: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val lastWorked = Library.lastWorked(station.id)
+    var selectedStream by remember(station.id) { mutableStateOf(Library.preferredStream(station.id)) }
+    val streams = remember(station) { Library.orderedStreams(station) }
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -943,6 +951,49 @@ private fun StationInfoDialog(
                 failedAt?.let { Text("Failed: ${DateUtils.getRelativeTimeSpanString(it)}", style = MaterialTheme.typography.bodySmall) }
                 lastWorked?.let { Text("Last worked: ${DateUtils.getRelativeTimeSpanString(it)}", style = MaterialTheme.typography.bodySmall) }
                 Spacer(Modifier.size(4.dp))
+                if (streams.size > 1) {
+                    Text("Stream preference", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Choose which known URL to try first. Automatic fallback remains enabled; different URLs may not provide different audio quality.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    var streamMenu by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(onClick = { streamMenu = true }) {
+                            Text(
+                                selectedStream?.let { chosen ->
+                                    "Preferred · " + (android.net.Uri.parse(chosen).host ?: "Stream")
+                                } ?: "Automatic (last working)",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        DropdownMenu(expanded = streamMenu, onDismissRequest = { streamMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Automatic (last working)") },
+                                onClick = {
+                                    streamMenu = false
+                                    selectedStream = null
+                                    onSelectStream(null)
+                                },
+                            )
+                            streams.forEachIndexed { index, url ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text("Stream ${index + 1} · " +
+                                            (android.net.Uri.parse(url).host ?: "Unknown host"),
+                                            maxLines = 1)
+                                    },
+                                    onClick = {
+                                        streamMenu = false
+                                        selectedStream = url
+                                        onSelectStream(url)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
                 if (failedAt != null) {
                     OutlinedButton(onClick = onTryAgain, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
