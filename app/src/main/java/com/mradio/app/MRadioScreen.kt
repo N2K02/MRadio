@@ -164,6 +164,7 @@ import java.util.Locale
 class PlayerUi {
     var mediaId by mutableStateOf<String?>(null)
     var isPlaying by mutableStateOf(false)
+    var playWhenReady by mutableStateOf(false)
     var buffering by mutableStateOf(false)
     var failed by mutableStateOf(false)
     var title by mutableStateOf<String?>(null)
@@ -180,6 +181,7 @@ private fun rememberPlayerUi(controller: MediaController?): PlayerUi {
             fun sync() {
                 ui.mediaId = c.currentMediaItem?.mediaId
                 ui.isPlaying = c.isPlaying
+                ui.playWhenReady = c.playWhenReady
                 ui.buffering = c.playbackState == Player.STATE_BUFFERING
                 ui.failed = c.playerError != null
                 ui.title = c.mediaMetadata.title?.toString()
@@ -315,7 +317,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     fun playOrPause(station: Station, from: List<Station>) {
         val c = controller ?: return
         if (player.mediaId == station.id && !player.failed) {
-            if (c.isPlaying) c.pause() else c.play()
+            if (c.playWhenReady) c.pause() else c.play()
         } else {
             Library.setBrowsing(from)
             Library.remember(listOf(station))
@@ -1458,23 +1460,24 @@ private fun NowPlayingBar(
                 }
             }
             Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                if (player.buffering) {
-                    LoadingIndicator(Modifier.size(44.dp))
-                } else {
-                    FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
-                        Icon(
-                            when {
-                                player.failed -> Icons.Rounded.Refresh
-                                player.isPlaying -> Icons.Rounded.Pause
-                                else -> Icons.Rounded.PlayArrow
-                            },
-                            contentDescription = when {
-                                player.failed -> "Try again"
-                                player.isPlaying -> "Pause"
-                                else -> "Play"
-                            },
-                        )
-                    }
+                FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
+                    Icon(
+                        when {
+                            player.failed -> Icons.Rounded.Refresh
+                            player.playWhenReady -> Icons.Rounded.Pause
+                            else -> Icons.Rounded.PlayArrow
+                        },
+                        contentDescription = when {
+                            player.failed -> "Try again"
+                            player.playWhenReady -> "Pause radio"
+                            else -> "Play radio"
+                        },
+                    )
+                }
+                if (player.buffering && player.playWhenReady) {
+                    LoadingIndicator(
+                        Modifier.size(16.dp).align(Alignment.TopEnd),
+                    )
                 }
             }
             IconButton(onClick = onNext) {
@@ -1639,24 +1642,23 @@ private fun FullPlayer(
                     Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous station")
                 }
                 Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
-                    if (player.buffering) {
-                        LoadingIndicator(Modifier.size(80.dp))
-                    } else {
-                        FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
-                            Icon(
-                                when {
-                                    player.failed -> Icons.Rounded.Refresh
-                                    player.isPlaying -> Icons.Rounded.Pause
-                                    else -> Icons.Rounded.PlayArrow
-                                },
-                                contentDescription = when {
-                                    player.failed -> "Try again"
-                                    player.isPlaying -> "Pause"
-                                    else -> "Play"
-                                },
-                                modifier = Modifier.size(40.dp),
-                            )
-                        }
+                    FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
+                        Icon(
+                            when {
+                                player.failed -> Icons.Rounded.Refresh
+                                player.playWhenReady -> Icons.Rounded.Pause
+                                else -> Icons.Rounded.PlayArrow
+                            },
+                            contentDescription = when {
+                                player.failed -> "Try again"
+                                player.playWhenReady -> "Pause radio"
+                                else -> "Play radio"
+                            },
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
+                    if (player.buffering && player.playWhenReady) {
+                        LoadingIndicator(Modifier.size(24.dp).align(Alignment.TopEnd))
                     }
                 }
                 FilledTonalIconButton(onClick = onNext, modifier = Modifier.size(56.dp)) {
