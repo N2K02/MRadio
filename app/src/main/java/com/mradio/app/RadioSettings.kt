@@ -101,6 +101,39 @@ fun RadioSettings(
             }.getOrElse { "Restore failed: ${it.message ?: "Invalid backup"}" }
         }
     }
+    val playlistExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("audio/x-mpegurl")
+    ) { uri ->
+        if (uri != null) {
+            stationStatus = runCatching {
+                context.contentResolver.openOutputStream(uri, "wt")?.use { stream ->
+                    stream.write(Library.exportCustomPlaylist().toByteArray(Charsets.UTF_8))
+                } ?: error("Could not create playlist")
+                "Playlist exported"
+            }.getOrElse { "Export failed: ${it.message}" }
+        }
+    }
+    val playlistImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            stationStatus = runCatching {
+                val data = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val count = stream.read(buffer)
+                        if (count < 0) break
+                        require(output.size() + count <= 200_000) { "Playlist is too large" }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toString(Charsets.UTF_8.name())
+                } ?: error("Could not read playlist")
+                val imported = Library.importCustomPlaylist(data)
+                "Imported $imported stations"
+            }.getOrElse { "Import failed: ${it.message}" }
+        }
+    }
     var page by rememberSaveable { mutableStateOf("Settings") }
     var editingStation by remember { mutableStateOf<Station?>(null) }
     var stationEditorOpen by remember { mutableStateOf(false) }
@@ -212,6 +245,32 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.AddCircleOutline, null) },
                                 modifier = Modifier.clickable { openStationEditor(null) },
                             )
+                            ListItem(
+                                headlineContent = { Text("Import station playlist") },
+                                supportingContent = { Text("Add stations from an M3U or M3U8 file") },
+                                modifier = Modifier.clickable {
+                                    stationStatus = null
+                                    playlistImportLauncher.launch(
+                                        arrayOf("audio/x-mpegurl", "application/x-mpegurl", "text/plain", "application/octet-stream")
+                                    )
+                                },
+                            )
+                            ListItem(
+                                headlineContent = { Text("Export station playlist") },
+                                supportingContent = { Text("Save your custom stations as an M3U playlist") },
+                                modifier = Modifier.clickable {
+                                    stationStatus = null
+                                    playlistExportLauncher.launch("mradio-custom-stations.m3u")
+                                },
+                            )
+                            stationStatus?.let { status ->
+                                ListItem(
+                                    headlineContent = { Text(status) },
+                                    trailingContent = {
+                                        TextButton(onClick = { stationStatus = null }) { Text("Dismiss") }
+                                    },
+                                )
+                            }
                             val customs = stationList.filterNot { it.builtIn }
                             if (customs.isEmpty()) {
                                 ListItem(headlineContent = { Text("No custom stations yet") })
