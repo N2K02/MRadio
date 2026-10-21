@@ -28,7 +28,16 @@ class RadioWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
         if (intent.action == ACTION_TOGGLE || intent.action == ACTION_NEXT) {
             val pending = goAsync()
-            withController(context) { controller ->
+            val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            val finish = {
+                if (finished.compareAndSet(false, true)) pending.finish()
+            }
+            // Broadcast receivers have a short execution window. Never leave goAsync pending
+            // indefinitely if the media service is slow or cannot be connected.
+            handler.postDelayed(finish, 8_000L)
+            runCatching {
+                withController(context) { controller ->
                 try {
                     if (controller != null) {
                         when (intent.action) {
@@ -59,9 +68,15 @@ class RadioWidgetProvider : AppWidgetProvider() {
                             ?: controller.currentMediaItem?.mediaMetadata?.title?.toString()
                         refresh(context, title, controller.isPlaying)
                     }
+                } catch (error: Exception) {
+                    Library.logPlayback("Widget playback failed: ${error.javaClass.simpleName}")
                 } finally {
-                    pending.finish()
+                    finish()
                 }
+                }
+            }.onFailure {
+                Library.logPlayback("Widget controller setup failed: ${it.javaClass.simpleName}")
+                finish()
             }
         } else if (intent.action == ACTION_REFRESH) {
             refreshFromPlayer(context)
@@ -127,6 +142,8 @@ class RadioWidgetProvider : AppWidgetProvider() {
                 val controller = runCatching { future.get() }.getOrNull()
                 try {
                     action(controller)
+                } catch (error: Exception) {
+                    Library.logPlayback("Widget Media3 command failed: ${error.javaClass.simpleName}")
                 } finally {
                     MediaController.releaseFuture(future)
                 }
