@@ -230,6 +230,11 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val updateState by AppUpdater.state.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
+    BackHandler(enabled = homeTab != "All stations" && !settingsMenu && !playerOpen && !equalizerOpen) {
+        homeTab = "All stations"
+        query = ""
+    }
+
     // Tap a section title to fold its list away. Kept across rotation and process restarts.
     var favouritesOpen by rememberSaveable { mutableStateOf(true) }
     // Reorder mode for Favourite Radios: up/down arrows replace the remove button.
@@ -522,13 +527,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                        }
-                        if (homeTab == "Recent") {
-                            Text(
-                                "Recently played",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                            )
                         }
                         if (showSearch) {
                             TextField(
