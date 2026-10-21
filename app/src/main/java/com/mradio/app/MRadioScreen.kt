@@ -90,6 +90,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -453,31 +455,39 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
                         )
                     }
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = { homeTab = "All stations"; query = "" }) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Rounded.Home, contentDescription = null)
-                            Text("Home", style = MaterialTheme.typography.labelSmall)
-                        }
+                    NavigationBar(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 0.dp,
+                    ) {
+                        NavigationBarItem(
+                            selected = homeTab == "All stations" && !settingsMenu,
+                            onClick = { homeTab = "All stations"; query = ""; settingsMenu = false },
+                            icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+                            label = { Text("Home") },
+                            alwaysShowLabel = true,
+                        )
+                        NavigationBarItem(
+                            selected = homeTab == "Favorites" && !settingsMenu,
+                            onClick = { homeTab = "Favorites"; query = ""; settingsMenu = false },
+                            icon = {
+                                Icon(
+                                    if (homeTab == "Favorites" && !settingsMenu) Icons.Rounded.Favorite
+                                    else Icons.Rounded.FavoriteBorder,
+                                    contentDescription = null,
+                                )
+                            },
+                            label = { Text("Favorites") },
+                            alwaysShowLabel = true,
+                        )
+                        NavigationBarItem(
+                            selected = settingsMenu,
+                            onClick = { settingsMenu = true },
+                            icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                            label = { Text("Settings") },
+                            alwaysShowLabel = true,
+                        )
                     }
-                    TextButton(onClick = { homeTab = "Favorites"; query = "" }) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Rounded.FavoriteBorder, contentDescription = null)
-                            Text("Favorites", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    TextButton(onClick = { settingsMenu = true }) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Rounded.Settings, contentDescription = null)
-                            Text("Settings", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
                 }
             },
         ) { padding ->
