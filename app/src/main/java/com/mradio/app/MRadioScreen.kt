@@ -1420,12 +1420,12 @@ private fun NowPlayingBar(
 ) {
     val broken by Library.broken.collectAsState()
     val indicatorColor = when {
-        player.failed || station.id in broken -> Color(0xFFEF5350)
+        player.failed -> Color(0xFFEF5350)
         player.isPlaying -> Color(0xFF4CAF50)
         else -> Color(0xFFFFA726)
     }
     val indicatorLabel = when {
-        player.failed || station.id in broken -> "Playback error"
+        player.failed -> "Playback error"
         player.isPlaying -> "Playing"
         else -> "Paused"
     }
