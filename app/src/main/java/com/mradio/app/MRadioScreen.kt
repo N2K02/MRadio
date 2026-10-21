@@ -591,7 +591,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         FilterChip(
                                             selected = workingOnly,
                                             onClick = { workingOnly = !workingOnly },
-                                            label = { Text("Unavailable", style = MaterialTheme.typography.labelMedium) },
+                                            label = { Text("Hide unavailable", style = MaterialTheme.typography.labelMedium) },
                                         )
                                         Spacer(Modifier.weight(1f))
                                         TextButton(onClick = {
@@ -708,6 +708,23 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                 RetryMessage("Couldn't reach the station directories for more stations.") { discoverKey++ }
                             }
                             else -> loading()
+                        }
+                    }
+                    if (!favouritesOpen && !moreOpen) {
+                        item(key = "sections-collapsed") {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 28.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text("Both sections are collapsed",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium)
+                                TextButton(onClick = {
+                                    favouritesOpen = true
+                                    moreOpen = true
+                                }) { Text("Show stations") }
+                            }
                         }
                     }
                     if (hidden.isNotEmpty()) {
