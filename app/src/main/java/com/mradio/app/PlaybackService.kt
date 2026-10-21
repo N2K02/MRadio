@@ -94,10 +94,69 @@ class PlaybackService : MediaLibraryService() {
     private var waitingForNetwork = false
     private var retryRound = 0
     private var retryJob: Job? = null
+    // Listening accounting runs only during actual audio output, not while paused or idle.
+    private var listeningStartMs = 0L
+    private var listeningTransport = "unknown"
+    private var listeningBitrateKbps: Int? = null
+    private var listeningJob: Job? = null
+
+    private fun networkTransport(): String {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        return when {
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "mobile"
+            else -> "unknown"
+        }
+    }
+
+    private fun flushListening() {
+        if (listeningStartMs == 0L) return
+        val now = SystemClock.elapsedRealtime()
+        val duration = (now - listeningStartMs).coerceAtLeast(0L)
+        listeningStartMs = now
+        // Respect the 60-second maximum accepted by Library.recordListening.
+        var remaining = duration
+        while (remaining > 0L) {
+            val step = minOf(remaining, 60_000L)
+            Library.recordListening(step, listeningBitrateKbps, listeningTransport)
+            remaining -= step
+        }
+    }
+
+    private fun updateListening(active: Boolean) {
+        if (!active) {
+            flushListening()
+            listeningStartMs = 0L
+            listeningJob?.cancel()
+            listeningJob = null
+            return
+        }
+        if (listeningStartMs != 0L) return
+        listeningStartMs = SystemClock.elapsedRealtime()
+        listeningTransport = networkTransport()
+        listeningBitrateKbps = Library.audio.value?.bitrateKbps
+        listeningJob = scope.launch {
+            while (true) {
+                delay(60_000L)
+                flushListening()
+                listeningTransport = networkTransport()
+                listeningBitrateKbps = Library.audio.value?.bitrateKbps
+            }
+        }
+    }
+
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         // Runs on a system thread; hop to the main thread before touching the player.
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            scope.launch {
+                if (listeningStartMs != 0L) {
+                    flushListening()
+                    listeningTransport = networkTransport()
+                    listeningBitrateKbps = Library.audio.value?.bitrateKbps
+                }
+            }
             if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             ) {
@@ -166,6 +225,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                updateListening(isPlaying)
                 RadioWidgetProvider.refresh(this@PlaybackService, current?.name, isPlaying)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     TileService.requestListeningState(
@@ -199,27 +259,6 @@ class PlaybackService : MediaLibraryService() {
             .setMediaButtonPreferences(notificationButtons())
             .build()
 
-        // Record only seconds spent actually playing; a stalled/buffering stream does not count.
-        // Reading the default network each sample attributes estimates to the observed transport.
-        scope.launch {
-            var previous = SystemClock.elapsedRealtime()
-            while (true) {
-                delay(5_000L)
-                val now = SystemClock.elapsedRealtime()
-                val delta = (now - previous).coerceIn(0L, 5_000L)
-                previous = now
-                if (player.isPlaying && player.playbackState == Player.STATE_READY && current != null) {
-                    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-                    val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-                    val transport = when {
-                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
-                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "mobile"
-                        else -> "unknown"
-                    }
-                    Library.recordListening(delta, Library.audio.value?.bitrateKbps, transport)
-                }
-            }
-        }
 
         // The notification's heart shows only while the station isn't in Favourite Radios.
         scope.launch { Library.mine.collect { refreshButtons() } }
@@ -347,6 +386,7 @@ class PlaybackService : MediaLibraryService() {
 
     /** Exit: stop the radio, remove the notification, close the app screen if it is open. */
     private fun exitApp() {
+        updateListening(false)
         current = null
         cancelRetry()
         setSleepTimer(0)
@@ -382,6 +422,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        updateListening(false)
         runCatching {
             (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
                 .unregisterNetworkCallback(networkCallback)
