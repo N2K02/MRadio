@@ -590,10 +590,11 @@ class PlaybackService : MediaLibraryService() {
         return result
     }
 
-    private fun pageOf(items: List<MediaItem>, page: Int, pageSize: Int): ImmutableList<MediaItem> {
-        if (pageSize <= 0 || pageSize == Int.MAX_VALUE) return ImmutableList.copyOf(items)
-        val from = (page.toLong() * pageSize).coerceIn(0L, items.size.toLong()).toInt()
-        val to = minOf(items.size, from + pageSize)
+    private fun <T> pageOf(items: List<T>, page: Int, pageSize: Int): ImmutableList<T> {
+        if (page < 0 || pageSize <= 0) return ImmutableList.of()
+        if (pageSize == Int.MAX_VALUE) return if (page == 0) ImmutableList.copyOf(items) else ImmutableList.of()
+        val from = (page.toLong() * pageSize).coerceAtMost(items.size.toLong()).toInt()
+        val to = (from.toLong() + pageSize).coerceAtMost(items.size.toLong()).toInt()
         return ImmutableList.copyOf(items.subList(from, to))
     }
 
@@ -671,8 +672,8 @@ class PlaybackService : MediaLibraryService() {
                 )
                 DISCOVER -> future {
                     runCatching { RadioBrowser.mauritius() }.onSuccess { Library.setDiscovered(it) }
-                    val known = Library.stations.value.map { it.id }.toSet()
-                    result(Library.moreStations().map { browseItem(it, artwork = it.id in known) })
+                    val visible = pageOf(Library.moreStations(), page, pageSize)
+                    LibraryResult.ofItemList(visible.map { browseItem(it, artwork = true) }, params)
                 }
                 else -> Futures.immediateFuture(
                     LibraryResult.ofError<ImmutableList<MediaItem>>(LibraryResult.RESULT_ERROR_BAD_VALUE),
