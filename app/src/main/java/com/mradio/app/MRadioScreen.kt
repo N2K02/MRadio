@@ -1,6 +1,10 @@
 package com.mradio.app
 
 import android.os.Bundle
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -8,12 +12,14 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -48,18 +54,24 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
@@ -79,6 +91,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -125,6 +139,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
@@ -149,6 +164,7 @@ import java.util.Locale
 class PlayerUi {
     var mediaId by mutableStateOf<String?>(null)
     var isPlaying by mutableStateOf(false)
+    var playWhenReady by mutableStateOf(false)
     var buffering by mutableStateOf(false)
     var failed by mutableStateOf(false)
     var title by mutableStateOf<String?>(null)
@@ -165,6 +181,7 @@ private fun rememberPlayerUi(controller: MediaController?): PlayerUi {
             fun sync() {
                 ui.mediaId = c.currentMediaItem?.mediaId
                 ui.isPlaying = c.isPlaying
+                ui.playWhenReady = c.playWhenReady
                 ui.buffering = c.playbackState == Player.STATE_BUFFERING
                 ui.failed = c.playerError != null
                 ui.title = c.mediaMetadata.title?.toString()
@@ -188,22 +205,37 @@ private fun placeName(place: String) = if (place == Directory.WORLDWIDE) "Worldw
 fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val stations by Library.stations.collectAsState()
     val mine by Library.mine.collectAsState()
+    val pinned by Library.pinned.collectAsState()
+    val recent by Library.recent.collectAsState()
     val broken by Library.broken.collectAsState()
     val hidden by Library.hidden.collectAsState()
     val player = rememberPlayerUi(controller)
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
+    val context = LocalContext.current
 
     var query by rememberSaveable { mutableStateOf("") }
+    var homeTab by rememberSaveable { mutableStateOf("All stations") }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
+    var filtersOpen by rememberSaveable { mutableStateOf(false) }
+    var selectedGenre by rememberSaveable { mutableStateOf("All genres") }
+    var stationSort by rememberSaveable { mutableStateOf("Default") }
+    var workingOnly by rememberSaveable { mutableStateOf(false) }
     var place by rememberSaveable { mutableStateOf(Library.place) }
     var pickCountry by remember { mutableStateOf(false) }
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     var infoFor by remember { mutableStateOf<Station?>(null) }
+    var confirmHideStation by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
     var settingsMenu by remember { mutableStateOf(false) }
     val updateState by AppUpdater.state.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = homeTab != "All stations" && !settingsMenu && !playerOpen && !equalizerOpen && infoFor == null && !showHidden && !pickCountry && confirmHideStation == null) {
+        homeTab = "All stations"
+        query = ""
+    }
 
     // Tap a section title to fold its list away. Kept across rotation and process restarts.
     var favouritesOpen by rememberSaveable { mutableStateOf(true) }
@@ -253,14 +285,31 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         searching = false
     }
 
-    val myList = remember(stations, mine, hidden) { Library.myStations() }
+    val availableGenres = remember(stations, discovered, online) {
+        (stations + discovered.orEmpty() + online.orEmpty())
+            .flatMap { it.tags.split(',') }
+            .map { it.trim().lowercase(Locale.ROOT) }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }.eachCount()
+            .entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .take(18).map { it.key }
+    }
+    fun filtered(items: List<Station>): List<Station> {
+        val eligible = items.filter {
+            (selectedGenre == "All genres" ||
+                it.tags.split(',').any { tag -> tag.trim().equals(selectedGenre, ignoreCase = true) }) &&
+                (!workingOnly || it.id !in broken)
+        }
+        return if (stationSort == "Name") eligible.sortedBy { it.name.lowercase(Locale.ROOT) } else eligible
+    }
+    val myList = remember(stations, mine, pinned, hidden) { Library.myStations() }
     val moreList = remember(stations, mine, discovered, place, hidden) {
         Library.moreStations(discovered.orEmpty(), mauritius = place == Directory.MAURITIUS)
     }
-    val localResults = remember(query, stations, mine, hidden) { Library.searchLocal(query) }
-    val onlineResults = remember(online, stations, hidden) {
-        online?.filterNot { Library.known(it) || Library.isHidden(it) }
-    }
+    val visibleMine = filtered(myList)
+    val visibleMore = filtered(moreList)
+    val localResults = filtered(Library.searchLocal(query))
+    val onlineResults = online?.let { filtered(it.filterNot { station -> Library.known(station) || Library.isHidden(station) }) }
 
     val current = player.mediaId?.let { id -> Library.find(id) }
     val currentBroken = current != null && current.id in broken
@@ -268,7 +317,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     fun playOrPause(station: Station, from: List<Station>) {
         val c = controller ?: return
         if (player.mediaId == station.id && !player.failed) {
-            if (c.isPlaying) c.pause() else c.play()
+            if (c.playWhenReady) c.pause() else c.play()
         } else {
             Library.setBrowsing(from)
             Library.remember(listOf(station))
@@ -338,6 +387,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             station = station,
             isCurrent = player.mediaId == station.id,
             isPlaying = player.mediaId == station.id && player.isPlaying,
+            isPlayRequested = player.mediaId == station.id && player.playWhenReady,
             inMineSection = inMineSection,
             isMine = isMine,
             isBroken = station.id in broken,
@@ -345,7 +395,52 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             onClick = { focus.clearFocus(); playOrPause(station, list) },
             onHeart = { if (isMine) removeFromMine(station) else addToMine(station) },
             onRemove = { removeFromMine(station) },
+            isPinned = station.id in pinned,
+            onPin = if (inMineSection) ({ Library.togglePinned(station.id) }) else null,
             onInfo = { infoFor = station },
+            onShare = {
+                val stream = Library.orderedStreams(station).firstOrNull {
+                    it.startsWith("https://", ignoreCase = true) ||
+                        it.startsWith("http://", ignoreCase = true)
+                }
+                val description = buildString {
+                    append(station.name)
+                    if (station.tags.isNotBlank()) append(" · ").append(station.subtitle)
+                    if (stream != null) append("\n").append(stream)
+                }
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, station.name)
+                    putExtra(Intent.EXTRA_TEXT, description)
+                }
+                runCatching {
+                    context.startActivity(Intent.createChooser(intent, "Share station"))
+                }.onFailure {
+                    announce("No app available for sharing", null)
+                }
+            },
+            onCopyInfo = {
+                val details = buildString {
+                    appendLine(station.name)
+                    appendLine("Country: ${countryName(station.country)}")
+                    if (station.tags.isNotBlank()) appendLine("Genres: ${station.tags}")
+                    if (station.location.isNotBlank()) appendLine("Location: ${station.location}")
+                    appendLine("Stream links: ${station.streams.size}")
+                    val url = Library.orderedStreams(station).firstOrNull()
+                    if (url != null) append("Preferred stream: ").append(url)
+                }.trim()
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("Station information", details))
+                announce("Station information copied", null)
+            },
+            onCopy = {
+                val url = Library.orderedStreams(station).firstOrNull()
+                if (url != null) {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("Station stream URL", url))
+                    announce("Stream URL copied", null)
+                } else announce("No stream URL is available yet", null)
+            },
             onMoveUp = if (inMineSection && arranging) ({ Library.moveInMine(station.id, -1) }) else null,
             onMoveDown = if (inMineSection && arranging) ({ Library.moveInMine(station.id, +1) }) else null,
             modifier = modifier,
@@ -356,131 +451,246 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-              // Keeps the player clear of the navigation keys / gesture bar.
-              Column(Modifier.navigationBarsPadding()) {
-                AnimatedVisibility(
-                    visible = current != null && !playerOpen,
-                    enter = slideInVertically { it },
-                    exit = slideOutVertically { it },
-                ) {
-                    current?.let { station ->
+                Column(Modifier.navigationBarsPadding()) {
+                    if (homeTab != "All stations" && current != null) {
                         NowPlayingBar(
-                            station = station,
+                            station = current,
                             player = player,
-                            isMine = station.id in mine || Library.inMine(station),
+                            isMine = Library.inMine(current),
                             onOpen = { playerOpen = true },
-                            onHeart = { addToMine(station) },
-                            onPlayPause = { if (player.failed) retry(station) else playOrPause(station, emptyList()) },
+                            onHeart = { addToMine(current) },
+                            onPlayPause = { if (player.failed) retry(current) else playOrPause(current, emptyList()) },
                             onPrevious = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
                             onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
                         )
                     }
+                    NavigationBar(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 0.dp,
+                    ) {
+                        NavigationBarItem(
+                            selected = homeTab == "All stations" && !settingsMenu,
+                            onClick = { homeTab = "All stations"; query = ""; settingsMenu = false },
+                            icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+                            label = { Text("Home") },
+                            alwaysShowLabel = true,
+                        )
+                        NavigationBarItem(
+                            selected = homeTab == "Favorites" && !settingsMenu,
+                            onClick = { homeTab = "Favorites"; query = ""; settingsMenu = false },
+                            icon = {
+                                Icon(
+                                    if (homeTab == "Favorites" && !settingsMenu) Icons.Rounded.Favorite
+                                    else Icons.Rounded.FavoriteBorder,
+                                    contentDescription = null,
+                                )
+                            },
+                            label = { Text("Favorites") },
+                            alwaysShowLabel = true,
+                        )
+                        NavigationBarItem(
+                            selected = settingsMenu,
+                            onClick = { settingsMenu = true },
+                            icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                            label = { Text("Settings") },
+                            alwaysShowLabel = true,
+                        )
+                    }
                 }
-              }
             },
         ) { padding ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
             ) {
-                item {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(start = 24.dp, end = 16.dp, top = 16.dp),
-                    ) {
-                        Text(
-                            "MRadio",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
+                item(key = "home-head") {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "mRadio",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
+                                Icon(Icons.Rounded.Search, contentDescription = "Search stations")
+                            }
+                            IconButton(onClick = {
+                                homeTab = if (homeTab == "Recent") "All stations" else "Recent"
+                                query = ""
+                            }) {
+                                Icon(
+                                    if (homeTab == "Recent") Icons.Rounded.Home else Icons.Rounded.History,
+                                    contentDescription = if (homeTab == "Recent") "Back to Home" else "Recently played",
+                                    tint = if (homeTab == "Recent") MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (showSearch) {
+                            TextField(
+                                value = query,
+                                onValueChange = { query = it },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                placeholder = { Text("Find a station") },
+                                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                                trailingIcon = {
+                                    if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
+                                        Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                                    }
+                                },
+                                singleLine = true,
+                                shape = CircleShape,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+                            )
+                        }
+                        if (homeTab == "All stations") PlaceChips(
+                            place = place,
+                            onPlace = ::choosePlace,
+                            onPickCountry = { pickCountry = true },
                         )
-                        Box {
-                            FilledTonalIconButton(onClick = { settingsMenu = true }) {
-                                Icon(Icons.Rounded.Settings, contentDescription = "Settings")
-                            }
-                            DropdownMenu(expanded = settingsMenu, onDismissRequest = { settingsMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Equalizer") },
-                                    leadingIcon = { Icon(Icons.Rounded.GraphicEq, contentDescription = null) },
-                                    onClick = {
-                                        settingsMenu = false
-                                        equalizerOpen = true
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Column {
-                                            Text("Update")
-                                            Text(
-                                                when (val u = updateState) {
-                                                    is AppUpdater.State.Checking -> "Checking…"
-                                                    is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
-                                                    is AppUpdater.State.Downloading -> "Downloading…"
-                                                    is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
-                                                    is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
-                                                    else -> "v${AppUpdater.installedVersionName} · check for updates"
-                                                },
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    },
-                                    leadingIcon = { Icon(Icons.Rounded.SystemUpdate, contentDescription = null) },
-                                    onClick = {
-                                        settingsMenu = false
-                                        // Other states already show their card with the right buttons.
-                                        if (updateState is AppUpdater.State.Idle || updateState is AppUpdater.State.UpToDate ||
-                                            updateState is AppUpdater.State.Failed
-                                        ) AppUpdater.check(manual = true)
-                                    },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        FilledTonalIconButton(onClick = onExit) {
-                            Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Exit")
-                        }
-                    }
-                    Text(
-                        "Radio from Mauritius and all around the world",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-                    )
-                    TextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        placeholder = { Text("Search stations or find new ones") },
-                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (query.isNotEmpty()) {
-                                IconButton(onClick = { query = "" }) {
-                                    Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                        if (homeTab == "All stations") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(onClick = { filtersOpen = !filtersOpen }) {
+                                    Icon(Icons.Rounded.FilterList, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (filtersOpen) "Hide filters" else "Filter stations")
                                 }
                             }
-                        },
-                        singleLine = true,
-                        shape = CircleShape,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                        ),
-                    )
-                    PlaceChips(
-                        place = place,
-                        onPlace = ::choosePlace,
-                        onPickCountry = { pickCountry = true },
-                    )
+                            AnimatedVisibility(filtersOpen) {
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                    Text("Genre", style = MaterialTheme.typography.labelMedium)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        (listOf("All genres") + availableGenres).forEach { genre ->
+                                            FilterChip(
+                                                selected = selectedGenre == genre,
+                                                onClick = { selectedGenre = genre; moreShown = PAGE; onlineShown = PAGE },
+                                                label = { Text(genre.replaceFirstChar { it.titlecase(Locale.ROOT) }) },
+                                            )
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        FilterChip(
+                                            selected = stationSort == "Name",
+                                            onClick = { stationSort = if (stationSort == "Name") "Default" else "Name" },
+                                            label = { Text("Sort A–Z") },
+                                        )
+                                        FilterChip(
+                                            selected = workingOnly,
+                                            onClick = { workingOnly = !workingOnly },
+                                            label = { Text("Hide unavailable") },
+                                        )
+                                        TextButton(onClick = {
+                                            selectedGenre = "All genres"
+                                            stationSort = "Default"
+                                            workingOnly = false
+                                        }) { Text("Reset") }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
+                if (homeTab == "All stations" && query.isBlank()) {
+                    item(key = "home-player") {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            onClick = { if (current != null) playerOpen = true },
+                        ) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 58)
+                                    else Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null)
+                                    }
+                                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                        Text(if (player.isPlaying) "● LIVE" else "NOW PLAYING",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.labelSmall)
+                                        Text(current?.name ?: "Choose a station",
+                                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            if (current == null) "Select a radio below" else statusText(current, player, currentBroken),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (current != null) IconButton(onClick = {
+                                        if (Library.inMine(current)) removeFromMine(current) else addToMine(current)
+                                    }) {
+                                        Icon(
+                                            if (Library.inMine(current)) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                            contentDescription = "Toggle favorite",
+                                        )
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
+                                        enabled = current != null) {
+                                        Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous station")
+                                    }
+                                    FilledIconButton(
+                                        onClick = {
+                                            if (current != null) {
+                                                if (player.failed) retry(current) else playOrPause(current, emptyList())
+                                            } else myList.firstOrNull()?.let { playOrPause(it, myList) }
+                                        },
+                                        modifier = Modifier.size(52.dp),
+                                        enabled = controller != null,
+                                    ) {
+                                        Icon(
+                                            if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                            contentDescription = if (player.isPlaying) "Pause radio" else "Play radio",
+                                        )
+                                    }
+                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
+                                        enabled = current != null) {
+                                        Icon(Icons.Rounded.SkipNext, contentDescription = "Next station")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
-                if (query.isBlank()) {
+                if (homeTab == "Favorites" && query.isBlank()) {
+                    header("Favorites")
+                    if (visibleMine.isEmpty()) message("No favorites match your filters.")
+                    items(visibleMine, key = { "favorites-" + it.id }) {
+                        StationItem(it, true, visibleMine, Modifier.animateItem())
+                    }
+                } else if (homeTab == "Recent" && query.isBlank()) {
+                    header("Recently played")
+                    val recentVisible = recent.filterNot { Library.isHidden(it) }
+                    if (recentVisible.isEmpty()) message("Stations you play will appear here.")
+                    items(recentVisible, key = { "history-" + it.id }) {
+                        StationItem(it, false, recentVisible, Modifier.animateItem())
+                    }
+                } else if (query.isBlank()) {
                     header(
                         "Favourite Radios",
                         expanded = favouritesOpen,
@@ -489,8 +699,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         } else null,
                     ) { favouritesOpen = !favouritesOpen }
                     if (favouritesOpen) {
-                        if (myList.isEmpty()) message("Tap the heart on any station below to add it here.")
-                        items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
+                        if (visibleMine.isEmpty()) message("No favorites match your filters.")
+                        items(visibleMine, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
                     }
 
                     header(
@@ -498,10 +708,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         expanded = moreOpen,
                     ) { moreOpen = !moreOpen }
                     if (moreOpen) {
-                        items(moreList.take(moreShown), key = { "more-" + it.id }) { StationItem(it, false, moreList, Modifier.animateItem()) }
-                        showMore(shown = moreShown, total = moreList.size) { moreShown += PAGE }
+                        items(visibleMore.take(moreShown), key = { "more-" + it.id }) { StationItem(it, false, visibleMore, Modifier.animateItem()) }
+                        showMore(shown = moreShown, total = visibleMore.size) { moreShown += PAGE }
                         when {
-                            discovered != null -> if (moreList.isEmpty()) message("No other stations found here.")
+                            discovered != null -> if (visibleMore.isEmpty()) message("No matching stations for these filters.")
                             discoverFailed -> item {
                                 RetryMessage("Couldn't reach the station directories for more stations.") { discoverKey++ }
                             }
@@ -573,6 +783,30 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         }
     }
 
+    if (settingsMenu) {
+        RadioSettings(
+            versionDescription = when (val u = updateState) {
+                is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
+                is AppUpdater.State.Checking -> "Checking…"
+                is AppUpdater.State.Downloading -> "Downloading…"
+                is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
+                is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
+                else -> "Installed v${AppUpdater.installedVersionName}"
+            },
+            onEqualizer = {
+                settingsMenu = false
+                equalizerOpen = true
+            },
+            onCheckUpdates = {
+                if (updateState is AppUpdater.State.Idle ||
+                    updateState is AppUpdater.State.UpToDate ||
+                    updateState is AppUpdater.State.Failed
+                ) AppUpdater.check(manual = true)
+            },
+            onDismiss = { settingsMenu = false },
+        )
+    }
+
     if (equalizerOpen) EqualizerSheet(onDismiss = { equalizerOpen = false })
 
     if (pickCountry) {
@@ -589,9 +823,38 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             isMine = Library.inMine(station),
             failedAt = broken[station.id],
             onRemoveFromMine = { infoFor = null; removeFromMine(station) },
-            onRemoveCompletely = { infoFor = null; removeCompletely(station) },
+            onRemoveCompletely = { infoFor = null; confirmHideStation = station },
             onTryAgain = { infoFor = null; retry(station) },
+            onSelectStream = { url ->
+                Library.setPreferredStream(station, url)
+                if (player.mediaId == station.id) {
+                    val resume = player.isPlaying
+                    controller?.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
+                    controller?.prepare()
+                    if (resume) controller?.play()
+                }
+                announce(if (url == null) "Automatic stream selection" else "Preferred stream saved", null)
+            },
             onDismiss = { infoFor = null },
+        )
+    }
+
+    confirmHideStation?.let { station ->
+        AlertDialog(
+            onDismissRequest = { confirmHideStation = null },
+            title = { Text("Remove ${station.name}?") },
+            text = {
+                Text("This hides the station from lists and search. You can restore it later in Removed stations.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmHideStation = null
+                    removeCompletely(station)
+                }) { Text("Remove") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmHideStation = null }) { Text("Cancel") }
+            },
         )
     }
 
@@ -697,26 +960,84 @@ private fun StationInfoDialog(
     onRemoveFromMine: () -> Unit,
     onRemoveCompletely: () -> Unit,
     onTryAgain: () -> Unit,
+    onSelectStream: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val lastWorked = Library.lastWorked(station.id)
+    var selectedStream by remember(station.id) { mutableStateOf(Library.preferredStream(station.id)) }
+    val streams = remember(station) { Library.orderedStreams(station) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Rounded.ErrorOutline, null, tint = MaterialTheme.colorScheme.error) },
-        title = { Text("${station.name} isn't available") },
+        icon = {
+            Icon(
+                if (failedAt == null) Icons.Rounded.Info else Icons.Rounded.ErrorOutline,
+                null,
+                tint = if (failedAt == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(if (failedAt == null) station.name else "${station.name} isn't available") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "None of its stream links answered, including the backup links MRadio looked up online. " +
-                        "The station may be off air, or it may have moved to a new link.",
-                )
+                if (failedAt != null) {
+                    Text("All known streams failed. The station may be off air or have changed its address.")
+                } else {
+                    Text("Country: ${countryName(station.country)}")
+                    if (station.tags.isNotBlank()) Text("Genres: ${station.tags}")
+                    if (station.location.isNotBlank()) Text("Location: ${station.location}")
+                    Text("Available stream links: ${station.streams.size}")
+                }
                 failedAt?.let { Text("Failed: ${DateUtils.getRelativeTimeSpanString(it)}", style = MaterialTheme.typography.bodySmall) }
                 lastWorked?.let { Text("Last worked: ${DateUtils.getRelativeTimeSpanString(it)}", style = MaterialTheme.typography.bodySmall) }
                 Spacer(Modifier.size(4.dp))
-                OutlinedButton(onClick = onTryAgain, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Try again")
+                if (streams.size > 1) {
+                    Text("Stream preference", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Choose which known URL to try first. Automatic fallback remains enabled; different URLs may not provide different audio quality.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    var streamMenu by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(onClick = { streamMenu = true }) {
+                            Text(
+                                selectedStream?.let { chosen ->
+                                    "Preferred · " + (android.net.Uri.parse(chosen).host ?: "Stream")
+                                } ?: "Automatic (last working)",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        DropdownMenu(expanded = streamMenu, onDismissRequest = { streamMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Automatic (last working)") },
+                                onClick = {
+                                    streamMenu = false
+                                    selectedStream = null
+                                    onSelectStream(null)
+                                },
+                            )
+                            streams.forEachIndexed { index, url ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text("Stream ${index + 1} · " +
+                                            (android.net.Uri.parse(url).host ?: "Unknown host"),
+                                            maxLines = 1)
+                                    },
+                                    onClick = {
+                                        streamMenu = false
+                                        selectedStream = url
+                                        onSelectStream(url)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                if (failedAt != null) {
+                    OutlinedButton(onClick = onTryAgain, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Try again")
+                    }
                 }
                 if (isMine) {
                     OutlinedButton(onClick = onRemoveFromMine, modifier = Modifier.fillMaxWidth()) {
@@ -728,7 +1049,7 @@ private fun StationInfoDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Keep") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
 }
 
@@ -854,6 +1175,7 @@ private fun StationRow(
     station: Station,
     isCurrent: Boolean,
     isPlaying: Boolean,
+    isPlayRequested: Boolean,
     inMineSection: Boolean,
     isMine: Boolean,
     isBroken: Boolean,
@@ -862,10 +1184,22 @@ private fun StationRow(
     onHeart: () -> Unit,
     onRemove: () -> Unit,
     onInfo: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onCopyInfo: () -> Unit,
+    isPinned: Boolean = false,
+    onPin: (() -> Unit)? = null,
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    // Only the selected row animates; all other rows remain static and inexpensive.
+    val rowColor by animateColorAsState(
+        targetValue = if (isCurrent) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(durationMillis = 240),
+        label = "Station selection",
+    )
     ListItem(
         headlineContent = {
             Text(station.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
@@ -887,43 +1221,66 @@ private fun StationRow(
         leadingContent = { StationBadge(station, spinning = isPlaying) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isBroken) {
-                    IconButton(onClick = onInfo) {
-                        Icon(Icons.Rounded.Info, contentDescription = "Why isn't it working?", tint = MaterialTheme.colorScheme.error)
-                    }
+                FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+                    Icon(
+                        if (isPlayRequested) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlayRequested) "Pause ${station.name}" else "Play ${station.name}",
+                    )
                 }
-                if (onMoveUp != null && onMoveDown != null) {
-                    IconButton(onClick = onMoveUp) {
-                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move ${station.name} up")
+                var menuOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "More options for ${station.name}")
                     }
-                    IconButton(onClick = onMoveDown) {
-                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move ${station.name} down")
-                    }
-                } else if (inMineSection) {
-                    IconButton(onClick = onRemove) {
-                        Icon(
-                            Icons.Rounded.RemoveCircleOutline,
-                            contentDescription = "Remove from Favourite Radios",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (isMine) "Remove from Favorites" else "Add to Favorites") },
+                            onClick = { menuOpen = false; onHeart() },
+                            leadingIcon = {
+                                Icon(if (isMine) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, null)
+                            },
                         )
-                    }
-                } else {
-                    IconButton(onClick = onHeart) {
-                        Icon(
-                            if (isMine) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            contentDescription = if (isMine) "Remove from Favourite Radios" else "Add to Favourite Radios",
-                            tint = if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (inMineSection && onPin != null) {
+                            DropdownMenuItem(
+                                text = { Text(if (isPinned) "Unpin" else "Pin to top") },
+                                onClick = { menuOpen = false; onPin() },
+                                leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Share station") },
+                            onClick = { menuOpen = false; onShare() },
+                            leadingIcon = { Icon(Icons.Rounded.Share, null) },
                         )
+                        DropdownMenuItem(
+                            text = { Text("Copy station information") },
+                            onClick = { menuOpen = false; onCopyInfo() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Copy stream URL") },
+                            onClick = { menuOpen = false; onCopy() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Station details") },
+                            onClick = { menuOpen = false; onInfo() },
+                            leadingIcon = { Icon(Icons.Rounded.Info, null) },
+                        )
+                        if (inMineSection && onMoveUp != null && onMoveDown != null) {
+                            DropdownMenuItem(text = { Text("Move up") },
+                                onClick = { menuOpen = false; onMoveUp() })
+                            DropdownMenuItem(text = { Text("Move down") },
+                                onClick = { menuOpen = false; onMoveDown() })
+                        }
                     }
                 }
             }
         },
         colors = ListItemDefaults.colors(
-            containerColor = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+            containerColor = rowColor,
         ),
         modifier = modifier
-            .padding(horizontal = 12.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
     )
 }
@@ -1035,8 +1392,15 @@ private fun NowPlayingBar(
     onNext: () -> Unit,
 ) {
     val broken by Library.broken.collectAsState()
+    val barColor by animateColorAsState(
+        targetValue = if (player.failed) MaterialTheme.colorScheme.errorContainer
+            else if (player.isPlaying) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = tween(240),
+        label = "Mini-player background",
+    )
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = barColor,
         shape = RoundedCornerShape(32.dp),
         tonalElevation = 3.dp,
         onClick = onOpen,
@@ -1070,13 +1434,21 @@ private fun NowPlayingBar(
                             modifier = Modifier.size(16.dp).padding(end = 4.dp),
                         )
                     }
-                    Text(
-                        statusText(station, player, station.id in broken),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (player.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = statusText(station, player, station.id in broken),
+                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+                        label = "Playback status",
+                        modifier = Modifier.weight(1f),
+                    ) { status ->
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (player.failed) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             if (!isMine) {
@@ -1089,23 +1461,24 @@ private fun NowPlayingBar(
                 }
             }
             Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                if (player.buffering) {
-                    LoadingIndicator(Modifier.size(44.dp))
-                } else {
-                    FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
-                        Icon(
-                            when {
-                                player.failed -> Icons.Rounded.Refresh
-                                player.isPlaying -> Icons.Rounded.Pause
-                                else -> Icons.Rounded.PlayArrow
-                            },
-                            contentDescription = when {
-                                player.failed -> "Try again"
-                                player.isPlaying -> "Pause"
-                                else -> "Play"
-                            },
-                        )
-                    }
+                FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
+                    Icon(
+                        when {
+                            player.failed -> Icons.Rounded.Refresh
+                            player.playWhenReady -> Icons.Rounded.Pause
+                            else -> Icons.Rounded.PlayArrow
+                        },
+                        contentDescription = when {
+                            player.failed -> "Try again"
+                            player.playWhenReady -> "Pause radio"
+                            else -> "Play radio"
+                        },
+                    )
+                }
+                if (player.buffering && player.playWhenReady) {
+                    LoadingIndicator(
+                        Modifier.size(16.dp).align(Alignment.TopEnd),
+                    )
                 }
             }
             IconButton(onClick = onNext) {
@@ -1136,11 +1509,14 @@ private fun FullPlayer(
     val sleepAt by Library.sleepAt.collectAsState()
     val info by produceState<Directory.Info?>(null, station.id) { value = Directory.info(station) }
     val since = remember(station.id) { System.currentTimeMillis() }
+    // Tick only while a sleep countdown exists, avoiding idle UI wake-ups.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(15_000)
+    LaunchedEffect(sleepAt) {
+        if (sleepAt != null) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(15_000)
+            }
         }
     }
     val uri = LocalUriHandler.current
@@ -1219,8 +1595,18 @@ private fun FullPlayer(
                 }
             }
 
-            Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
-                StationBadge(station, spinning = player.isPlaying, size = 220)
+            // Keep the artwork visually grouped, without adding animation work when paused.
+            Surface(
+                shape = RoundedCornerShape(36.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().padding(vertical = 28.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    StationBadge(station, spinning = player.isPlaying, size = 220)
+                }
             }
             Text(
                 station.name,
@@ -1257,24 +1643,23 @@ private fun FullPlayer(
                     Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous station")
                 }
                 Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
-                    if (player.buffering) {
-                        LoadingIndicator(Modifier.size(80.dp))
-                    } else {
-                        FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
-                            Icon(
-                                when {
-                                    player.failed -> Icons.Rounded.Refresh
-                                    player.isPlaying -> Icons.Rounded.Pause
-                                    else -> Icons.Rounded.PlayArrow
-                                },
-                                contentDescription = when {
-                                    player.failed -> "Try again"
-                                    player.isPlaying -> "Pause"
-                                    else -> "Play"
-                                },
-                                modifier = Modifier.size(40.dp),
-                            )
-                        }
+                    FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
+                        Icon(
+                            when {
+                                player.failed -> Icons.Rounded.Refresh
+                                player.playWhenReady -> Icons.Rounded.Pause
+                                else -> Icons.Rounded.PlayArrow
+                            },
+                            contentDescription = when {
+                                player.failed -> "Try again"
+                                player.playWhenReady -> "Pause radio"
+                                else -> "Play radio"
+                            },
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
+                    if (player.buffering && player.playWhenReady) {
+                        LoadingIndicator(Modifier.size(24.dp).align(Alignment.TopEnd))
                     }
                 }
                 FilledTonalIconButton(onClick = onNext, modifier = Modifier.size(56.dp)) {

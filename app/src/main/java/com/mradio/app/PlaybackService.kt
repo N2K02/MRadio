@@ -1,6 +1,9 @@
 package com.mradio.app
 
 import android.app.PendingIntent
+import android.content.ComponentName
+import android.os.Build
+import android.service.quicksettings.TileService
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -8,6 +11,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -140,11 +144,16 @@ class PlaybackService : MediaLibraryService() {
 
         player.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
+                Library.logPlayback("Stream error ${error.errorCodeName} · ${current?.name ?: "unknown"}")
                 onStreamFailed()
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_BUFFERING) {
+                    Library.logPlayback("Buffering · ${current?.name ?: "unknown"}")
+                }
                 if (playbackState == Player.STATE_READY) {
+                    Library.logPlayback("Playing · ${current?.name ?: "unknown"}")
                     val station = current ?: return
                     queue.getOrNull(attempt)?.let { Library.markGood(station.id, it) }
                     wasPlaying = true
@@ -153,6 +162,16 @@ class PlaybackService : MediaLibraryService() {
                     retryRound = 0
                     retryJob?.cancel()
                     updateAudioInfo()
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                RadioWidgetProvider.refresh(this@PlaybackService, current?.name, isPlaying)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    TileService.requestListeningState(
+                        this@PlaybackService,
+                        ComponentName(this@PlaybackService, RadioQuickTileService::class.java),
+                    )
                 }
             }
 
@@ -179,6 +198,28 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(notificationButtons())
             .build()
+
+        // Record only seconds spent actually playing; a stalled/buffering stream does not count.
+        // Reading the default network each sample attributes estimates to the observed transport.
+        scope.launch {
+            var previous = SystemClock.elapsedRealtime()
+            while (true) {
+                delay(5_000L)
+                val now = SystemClock.elapsedRealtime()
+                val delta = (now - previous).coerceIn(0L, 5_000L)
+                previous = now
+                if (player.isPlaying && player.playbackState == Player.STATE_READY && current != null) {
+                    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                    val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                    val transport = when {
+                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
+                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "mobile"
+                        else -> "unknown"
+                    }
+                    Library.recordListening(delta, Library.audio.value?.bitrateKbps, transport)
+                }
+            }
+        }
 
         // The notification's heart shows only while the station isn't in Favourite Radios.
         scope.launch { Library.mine.collect { refreshButtons() } }
@@ -311,8 +352,27 @@ class PlaybackService : MediaLibraryService() {
         setSleepTimer(0)
         player.stop()
         player.clearMediaItems()
+        RadioWidgetProvider.refresh(this, null, false)
         AppExit.request()
         stopSelf()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == RadioAlarm.ACTION_PLAY_ALARM) {
+            val stationId = intent.getStringExtra("stationId")
+            val station = stationId?.let { Library.find(it) }
+            if (station != null) {
+                // Start immediately so Media3 can create its foreground media notification.
+                player.setMediaItem(startStation(station))
+                player.prepare()
+                player.play()
+                Library.logPlayback("Radio alarm started · ${station.name}")
+            } else {
+                stopSelf(startId)
+            }
+            return START_NOT_STICKY
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
@@ -337,12 +397,15 @@ class PlaybackService : MediaLibraryService() {
     /** Sets up the fallback queue for [station] and returns the item for its best stream. */
     private fun startStation(station: Station): MediaItem {
         current = station
+        Library.recordPlayed(station)
+        Library.logPlayback("Selected · ${station.name}")
         queue = Library.orderedStreams(station)
         attempt = 0
         lookedUpOnline = false
         wasPlaying = false
         playedBefore = false
         cancelRetry()
+        RadioWidgetProvider.refresh(this, station.name, false)
         Library.lastPlayed = station.id
         Library.audio.value = null
         lastSong = null
@@ -590,10 +653,11 @@ class PlaybackService : MediaLibraryService() {
         return result
     }
 
-    private fun pageOf(items: List<MediaItem>, page: Int, pageSize: Int): ImmutableList<MediaItem> {
-        if (pageSize <= 0 || pageSize == Int.MAX_VALUE) return ImmutableList.copyOf(items)
-        val from = (page.toLong() * pageSize).coerceIn(0L, items.size.toLong()).toInt()
-        val to = minOf(items.size, from + pageSize)
+    private fun <T> pageOf(items: List<T>, page: Int, pageSize: Int): ImmutableList<T> {
+        if (page < 0 || pageSize <= 0) return ImmutableList.of()
+        if (pageSize == Int.MAX_VALUE) return if (page == 0) ImmutableList.copyOf(items) else ImmutableList.of()
+        val from = (page.toLong() * pageSize).coerceAtMost(items.size.toLong()).toInt()
+        val to = (from.toLong() + pageSize).coerceAtMost(items.size.toLong()).toInt()
         return ImmutableList.copyOf(items.subList(from, to))
     }
 
@@ -671,8 +735,8 @@ class PlaybackService : MediaLibraryService() {
                 )
                 DISCOVER -> future {
                     runCatching { RadioBrowser.mauritius() }.onSuccess { Library.setDiscovered(it) }
-                    val known = Library.stations.value.map { it.id }.toSet()
-                    result(Library.moreStations().map { browseItem(it, artwork = it.id in known) })
+                    val visible = pageOf(Library.moreStations(), page, pageSize)
+                    LibraryResult.ofItemList(visible.map { browseItem(it, artwork = true) }, params)
                 }
                 else -> Futures.immediateFuture(
                     LibraryResult.ofError<ImmutableList<MediaItem>>(LibraryResult.RESULT_ERROR_BAD_VALUE),
@@ -722,7 +786,10 @@ class PlaybackService : MediaLibraryService() {
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = future {
             val found = searchResults[query] ?: searchStations(query).also { searchResults[query] = it }
-            LibraryResult.ofItemList(pageOf(found.map { browseItem(it, artwork = false) }, page, pageSize), params)
+            // Supply artwork for visible search results as well as favourites.
+            // Pagination happens before artwork generation to avoid work for off-screen results.
+            val visible = pageOf(found, page, pageSize)
+            LibraryResult.ofItemList(visible.map { browseItem(it, artwork = true) }, params)
         }
 
         /** Every "play this" request (app, Auto, voice) arrives here with just a station id or a query. */
@@ -755,9 +822,20 @@ class PlaybackService : MediaLibraryService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = future {
-            val station = Library.lastPlayed?.let { resolve(it) }
-                ?: Library.myStations().firstOrNull() ?: Library.stations.value.first()
-            MediaSession.MediaItemsWithStartPosition(listOf(startStation(station)), 0, C.TIME_UNSET)
+            // Android Auto may request resumption after connecting. Respect its
+            // separate opt-in preference without affecting phone or Bluetooth controls.
+            val isAndroidAuto = controller.packageName == "com.google.android.projection.gearhead"
+            if (isAndroidAuto && !Library.autoPlayAuto.value) {
+                MediaSession.MediaItemsWithStartPosition(emptyList(), 0, C.TIME_UNSET)
+            } else {
+                // A browser connection alone never starts audio. Only the media
+                // controller's explicit resumption request can restore a station.
+                val station = Library.lastPlayed?.let { resolve(it) }
+                    ?: Library.myStations().firstOrNull()
+                    ?: Library.stations.value.firstOrNull()
+                val items = if (station != null) listOf(startStation(station)) else emptyList()
+                MediaSession.MediaItemsWithStartPosition(items, 0, C.TIME_UNSET)
+            }
         }
     }
 

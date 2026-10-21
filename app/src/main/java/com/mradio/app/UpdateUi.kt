@@ -60,7 +60,7 @@ private tailrec fun Context.activity(): Activity? = when (this) {
 
 /**
  * Shows when an update is available, downloading or ready to install; hidden otherwise.
- * Put it near the top of the main screen.
+ * Rendered only on the Settings > About & updates page for both release channels.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -93,7 +93,7 @@ fun UpdateCard(modifier: Modifier = Modifier) {
                     is AppUpdater.State.Checking -> {
                         Title("Checking for updates…")
                         LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text("Contacting GitHub for the latest release.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (AppUpdater.experimentalEnabled.value) "Checking successful experimental builds and stable releases." else "Contacting GitHub for the latest release.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     is AppUpdater.State.UpToDate -> {
                         Title("You're up to date")
@@ -103,10 +103,10 @@ fun UpdateCard(modifier: Modifier = Modifier) {
                         )
                     }
                     is AppUpdater.State.Available -> {
-                        Title("Update available: ${s.release.versionName}")
+                        Title(if (s.release.experimental) "Experimental build: ${s.release.versionName}" else "Update available: ${s.release.versionName}")
                         Notes(s.release)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { diagnosticsVisible = false; AppUpdater.update(s.release) }) { Text("Update now") }
+                            Button(onClick = { diagnosticsVisible = false; AppUpdater.update(s.release) }) { Text(if (s.release.experimental) "Install test build" else "Update now") }
                             TextButton(onClick = { AppUpdater.dismiss() }) { Text("Later") }
                             TextButton(onClick = { AppUpdater.skip(s.release) }) { Text("Skip this version") }
                         }
@@ -164,7 +164,7 @@ fun UpdateCard(modifier: Modifier = Modifier) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             s.release?.let { r -> Button(onClick = { diagnosticsVisible = false; AppUpdater.update(r) }) { Text("Try again") } }
                             TextButton(onClick = { activity?.let { AppUpdater.openReleasePage(it, s.release) } }) {
-                                Text("Open release page")
+                                Text(if (s.release?.experimental == true) "Open workflow run" else "Open release page")
                             }
                             TextButton(onClick = { AppUpdater.dismiss() }) { Text("Close") }
                         }

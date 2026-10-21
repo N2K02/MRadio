@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.zip.ZipInputStream
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,6 +64,8 @@ object AppUpdater {
         /** Lowercase hex, when GitHub provides it. */
         val sha256: String?,
         val pageUrl: String,
+        val experimental: Boolean = false,
+        val archiveSha256: String? = null,
     )
 
     sealed interface State {
@@ -82,11 +85,22 @@ object AppUpdater {
     val state: StateFlow<State> = _state
 
     private val prefs by lazy { app.getSharedPreferences("app_updater", Context.MODE_PRIVATE) }
+    private val _experimentalEnabled = MutableStateFlow(false)
+    val experimentalEnabled: StateFlow<Boolean> = _experimentalEnabled
+
+    fun setExperimentalEnabled(enabled: Boolean) {
+        _experimentalEnabled.value = enabled
+        prefs.edit().putBoolean("experimentalEnabled", enabled).apply()
+        dismiss()
+        check(manual = true)
+    }
 
     fun init(context: Context, repo: String, appName: String) {
         app = context.applicationContext
         this.repo = repo
         this.appName = appName
+        _experimentalEnabled.value = app.getSharedPreferences("app_updater", Context.MODE_PRIVATE)
+            .getBoolean("experimentalEnabled", false)
         if (context is Activity) activityRef = WeakReference(context)
         // A new app start: an update that installed (or was abandoned) leaves its APK behind.
         if (_state.value is State.Idle) runCatching { updateDir().deleteRecursively() }
@@ -116,7 +130,10 @@ object AppUpdater {
         if (job?.isActive == true) return
         job = scope.launch {
             _state.value = State.Checking
-            val result = runCatching { latestRelease() }
+            val result = runCatching {
+                val experimental = if (_experimentalEnabled.value) runCatching { latestExperimental() }.getOrNull() else null
+                experimental?.takeIf { it.versionCode > installedVersionCode } ?: latestRelease()
+            }
             prefs.edit().putLong("lastCheck", System.currentTimeMillis()).apply()
             val release = result.getOrNull()
             _state.value = when {
@@ -146,7 +163,7 @@ object AppUpdater {
             val file = apkFile(release)
             try {
                 if (!(file.exists() && verify(file, release) == null)) {
-                    download(release, file)
+                    if (release.experimental) downloadExperimental(release, file) else download(release, file)
                     verify(file, release)?.let { problem ->
                         file.delete()
                         _state.value = State.Failed(problem, release, diagnostic(IllegalStateException(problem), release))
@@ -216,7 +233,10 @@ object AppUpdater {
             if (o.optBoolean("draft") || o.optBoolean("prerelease")) return@withContext null
             val tag = o.optString("tag_name")
             val name = tag.removePrefix("v")
-            val code = versionCodeFromName(name) ?: return@withContext null
+            val body = o.optString("body")
+            val code = Regex("""(?m)^Version code:\s*(\d+)""").find(body)
+                ?.groupValues?.get(1)?.toLongOrNull()
+                ?: versionCodeFromName(name) ?: return@withContext null
             val assets = o.optJSONArray("assets") ?: return@withContext null
             val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
                 .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) }
@@ -235,6 +255,59 @@ object AppUpdater {
         } finally {
             c.disconnect()
         }
+    }
+
+    /** Only choose completed, successful PR runs; never use an unsigned or failed artifact. */
+    private suspend fun latestExperimental(): Release? = withContext(Dispatchers.IO) {
+        fun requestJson(address: String): JSONObject {
+            val connection = URL(address).openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = 10_000
+                connection.readTimeout = 15_000
+                connection.setRequestProperty("Accept", "application/vnd.github+json")
+                connection.setRequestProperty("User-Agent", "$appName-updater (Android)")
+                if (connection.responseCode != 200) throw httpError(connection, connection.responseCode)
+                return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            } finally {
+                connection.disconnect()
+            }
+        }
+        val runs = requestJson(
+            "https://api.github.com/repos/$repo/actions/workflows/build.yml/runs?event=pull_request&status=success&per_page=30"
+        ).optJSONArray("workflow_runs") ?: return@withContext null
+        for (i in 0 until runs.length()) {
+            val run = runs.getJSONObject(i)
+            if (run.optString("conclusion") != "success" || run.optString("event") != "pull_request") continue
+            if (run.optJSONObject("head_repository")?.optString("full_name") != repo) continue
+            val runId = run.optLong("id")
+            val number = run.optLong("run_number")
+            val code = 100000L + number
+            if (runId <= 0L || number <= 0L || code <= installedVersionCode) continue
+            val artifacts = requestJson(
+                "https://api.github.com/repos/$repo/actions/runs/$runId/artifacts"
+            ).optJSONArray("artifacts") ?: continue
+            for (j in 0 until artifacts.length()) {
+                val artifact = artifacts.getJSONObject(j)
+                val name = artifact.optString("name")
+                if (artifact.optBoolean("expired") || !name.startsWith("$appName-PR-")) continue
+                val digest = artifact.optString("digest").removePrefix("sha256:").lowercase()
+                if (digest.length != 64 || !digest.all { it in '0'..'9' || it in 'a'..'f' }) continue
+                return@withContext Release(
+                    tag = "experimental-$runId",
+                    versionName = "Experimental #$number",
+                    versionCode = code,
+                    notes = listOf("Successful pull request build #$number", "Experimental — not a stable release"),
+                    apkUrl = "https://nightly.link/$repo/actions/runs/$runId/$name.zip",
+                    apkName = "$appName-experimental-$runId.apk",
+                    apkSize = 0L,
+                    sha256 = null,
+                    pageUrl = run.optString("html_url"),
+                    experimental = true,
+                    archiveSha256 = digest,
+                )
+            }
+        }
+        null
     }
 
     /** Same rule as the build: "1.8" -> 18, "2.0" -> 20. */
@@ -312,6 +385,88 @@ object AppUpdater {
         }
     }
 
+    /** Download a successful run ZIP, check GitHub's checksum, and extract its single signed APK. */
+    private suspend fun downloadExperimental(release: Release, apk: File) = withContext(Dispatchers.IO) {
+        updateDir().mkdirs()
+        updateDir().listFiles()?.filter { it != apk }?.forEach { it.delete() }
+        val zip = File(updateDir(), "experimental.zip")
+        val tmp = File(updateDir(), "experimental.part")
+        val expected = release.archiveSha256 ?: throw IOException("Missing artifact checksum")
+        try {
+            _state.value = State.Downloading(release, null)
+            var url = URL(release.apkUrl)
+            var redirects = 0
+            while (true) {
+                if (url.protocol != "https") throw IOException("Insecure artifact URL")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = false
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 45_000
+                connection.setRequestProperty("User-Agent", "$appName-updater (Android)")
+                val status = connection.responseCode
+                if (status in 300..399 && redirects++ < 6) {
+                    url = URL(url, connection.getHeaderField("Location") ?: throw IOException("Missing redirect URL"))
+                    connection.disconnect()
+                    continue
+                }
+                if (status != 200) throw httpError(connection, status)
+                try {
+                    val md = MessageDigest.getInstance("SHA-256")
+                    val total = connection.contentLengthLong
+                    var received = 0L
+                    connection.inputStream.use { input ->
+                        tmp.outputStream().use { output ->
+                            val bytes = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = input.read(bytes)
+                                if (n < 0) break
+                                received += n
+                                if (received > 250L * 1024 * 1024) throw IOException("Artifact too large")
+                                md.update(bytes, 0, n)
+                                output.write(bytes, 0, n)
+                                if (total > 0L) _state.value = State.Downloading(
+                                    release, (received.toFloat() / total).coerceIn(0f, 1f)
+                                )
+                            }
+                        }
+                    }
+                    if (md.digest().joinToString("") { "%02x".format(it) } != expected)
+                        throw IOException("GitHub artifact SHA-256 checksum mismatch")
+                } finally {
+                    connection.disconnect()
+                }
+                break
+            }
+            if (!tmp.renameTo(zip)) throw IOException("Cannot save artifact")
+            var found = false
+            ZipInputStream(zip.inputStream().buffered()).use { input ->
+                while (true) {
+                    val entry = input.nextEntry ?: break
+                    if (!entry.isDirectory && entry.name.endsWith(".apk", ignoreCase = true)) {
+                        if (found) throw IOException("More than one APK in workflow artifact")
+                        found = true
+                        var count = 0L
+                        apk.outputStream().use { output ->
+                            val bytes = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = input.read(bytes)
+                                if (n < 0) break
+                                count += n
+                                if (count > 200L * 1024 * 1024) throw IOException("APK too large")
+                                output.write(bytes, 0, n)
+                            }
+                        }
+                    }
+                    input.closeEntry()
+                }
+            }
+            if (!found) throw IOException("Workflow artifact contains no APK")
+        } finally {
+            tmp.delete()
+            zip.delete()
+        }
+    }
+
     /** Null if the APK is good to install, else what's wrong (in plain words). */
     private suspend fun verify(file: File, release: Release): String? = withContext(Dispatchers.IO) {
         if (release.apkSize > 0 && file.length() != release.apkSize) return@withContext "The download was incomplete. Please try again."
@@ -321,9 +476,11 @@ object AppUpdater {
         val apk = archiveInfo(file) ?: return@withContext "The downloaded file isn't a valid app."
         if (apk.packageName != app.packageName) return@withContext "The downloaded file is a different app."
         if (versionCodeOf(apk) <= installedVersionCode) return@withContext "The downloaded version isn't newer than this one."
+        if (release.experimental && versionCodeOf(apk) != release.versionCode)
+            return@withContext "Artifact APK version does not match the successful workflow run."
         val mine = signerDigests(packageInfo(app.packageName, signatures = true))
         val theirs = signerDigests(apk)
-        if (mine.isNotEmpty() && theirs.isNotEmpty() && mine.intersect(theirs).isEmpty()) {
+        if (mine.isEmpty() || theirs.isEmpty() || mine.intersect(theirs).isEmpty()) {
             return@withContext "This update is signed with a different key, so Android can't install it over the current app."
         }
         null
