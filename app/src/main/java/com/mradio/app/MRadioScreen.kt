@@ -233,6 +233,11 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val updateState by AppUpdater.state.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
+    BackHandler(enabled = settingsMenu) {
+        settingsMenu = false
+        homeTab = "All stations"
+    }
+
     BackHandler(enabled = homeTab != "All stations" && !settingsMenu && !playerOpen && !equalizerOpen && infoFor == null && !showHidden && !pickCountry && confirmHideStation == null) {
         homeTab = "All stations"
         query = ""
@@ -568,8 +573,9 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             },
         ) { padding ->
             if (settingsMenu) {
-        RadioSettings(
-            versionDescription = when (val u = updateState) {
+                RadioSettings(
+                    modifier = Modifier.padding(padding),
+                    versionDescription = when (val u = updateState) {
                 is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
                 is AppUpdater.State.Checking -> "Checking…"
                 is AppUpdater.State.Downloading -> "Downloading…"
