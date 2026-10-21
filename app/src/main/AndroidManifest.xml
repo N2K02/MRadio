@@ -71,6 +71,16 @@
             </intent-filter>
         </service>
 
+        <!-- Compact play / pause widget; broadcasts are explicit and app-scoped. -->
+        <receiver android:name=".RadioWidgetProvider" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/radio_widget_info" />
+        </receiver>
+
         <!-- Alarm receiver is explicitly targeted; not accessible to other apps. -->
         <receiver android:name=".RadioAlarmReceiver" android:exported="false" />
 
