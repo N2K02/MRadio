@@ -236,7 +236,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     }
 
     // Tap a section title to fold its list away. Kept across rotation and process restarts.
-    var favouritesOpen by rememberSaveable { mutableStateOf(true) }
     // Reorder mode for Favourite Radios: up/down arrows replace the remove button.
     var arranging by rememberSaveable { mutableStateOf(false) }
     var moreOpen by rememberSaveable { mutableStateOf(true) }
@@ -681,25 +680,19 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 }
 
                 if (homeTab == "Favorites" && query.isBlank()) {
-                    header("Favorites")
-                    if (visibleMine.isEmpty()) message("No favorites match your filters.")
+                    header(
+                        "Favorites",
+                        action = if (myList.size > 1) {
+                            { TextButton(onClick = { arranging = !arranging }) {
+                                Text(if (arranging) "Done" else "Reorder")
+                            } }
+                        } else null,
+                    )
+                    if (visibleMine.isEmpty()) message("No favorites yet. Add stations from Home.")
                     items(visibleMine, key = { "favorites-" + it.id }) {
                         StationItem(it, true, visibleMine, Modifier.animateItem())
                     }
-
                 } else if (query.isBlank()) {
-                    header(
-                        "Favourite Radios",
-                        expanded = favouritesOpen,
-                        action = if (favouritesOpen && myList.size > 1) {
-                            { TextButton(onClick = { arranging = !arranging }) { Text(if (arranging) "Done" else "Reorder") } }
-                        } else null,
-                    ) { favouritesOpen = !favouritesOpen }
-                    if (favouritesOpen) {
-                        if (visibleMine.isEmpty()) message("No favorites match your filters.")
-                        items(visibleMine, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
-                    }
-
                     header(
                         if (place == Directory.WORLDWIDE) "Popular worldwide" else "More from ${placeName(place)}",
                         expanded = moreOpen,
@@ -715,20 +708,15 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             else -> loading()
                         }
                     }
-                    if (!favouritesOpen && !moreOpen) {
-                        item(key = "sections-collapsed") {
+                    if (!moreOpen) {
+                        item(key = "stations-collapsed") {
                             Column(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 28.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                Text("Both sections are collapsed",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyMedium)
-                                TextButton(onClick = {
-                                    favouritesOpen = true
-                                    moreOpen = true
-                                }) { Text("Show stations") }
+                                Text("Station suggestions are collapsed",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { moreOpen = true }) { Text("Show stations") }
                             }
                         }
                     }
