@@ -8,6 +8,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -184,6 +185,28 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(notificationButtons())
             .build()
+
+        // Record only seconds spent actually playing; a stalled/buffering stream does not count.
+        // Reading the default network each sample attributes estimates to the observed transport.
+        scope.launch {
+            var previous = SystemClock.elapsedRealtime()
+            while (true) {
+                delay(5_000L)
+                val now = SystemClock.elapsedRealtime()
+                val delta = (now - previous).coerceIn(0L, 5_000L)
+                previous = now
+                if (player.isPlaying && player.playbackState == Player.STATE_READY && current != null) {
+                    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                    val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                    val transport = when {
+                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
+                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "mobile"
+                        else -> "unknown"
+                    }
+                    Library.recordListening(delta, Library.audio.value?.bitrateKbps, transport)
+                }
+            }
+        }
 
         // The notification's heart shows only while the station isn't in Favourite Radios.
         scope.launch { Library.mine.collect { refreshButtons() } }
