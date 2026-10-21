@@ -37,6 +37,13 @@ object Library {
     val broken: StateFlow<Map<String, Long>> = _broken
 
     /** Stations removed completely (normalized names, so every source's copy stays hidden). */
+    private val _recent = MutableStateFlow<List<Station>>(emptyList())
+    val recent: StateFlow<List<Station>> = _recent
+    private val _pinned = MutableStateFlow<Set<String>>(emptySet())
+    val pinned: StateFlow<Set<String>> = _pinned
+    private val _events = MutableStateFlow<List<String>>(emptyList())
+    val events: StateFlow<List<String>> = _events
+
     private val _hidden = MutableStateFlow<Map<String, String>>(emptyMap())
     /** normalized name -> display name */
     val hidden: StateFlow<Map<String, String>> = _hidden
@@ -71,6 +78,11 @@ object Library {
             val o = JSONObject(prefs.getString("hidden", "{}") ?: "{}")
             o.keys().asSequence().associateWith { o.getString(it) }
         }.getOrDefault(emptyMap())
+        _recent.value = runCatching {
+            val a = JSONArray(prefs.getString("recent", "[]"))
+            (0 until a.length()).map { Station.fromJson(a.getJSONObject(it)) }.distinctBy { it.id }.take(20)
+        }.getOrDefault(emptyList())
+        _pinned.value = prefs.getStringSet("pinned", emptySet())?.toSet() ?: emptySet()
         val saved = loadSaved()
         _stations.value = BuiltInStations.all + saved
         val ids = _stations.value.map { it.id }.toSet()
@@ -114,7 +126,31 @@ object Library {
         prefs.edit().putString("hidden", JSONObject(_hidden.value as Map<*, *>).toString()).apply()
     }
 
-    fun find(id: String): Station? = _stations.value.firstOrNull { it.id == id } ?: seen[id]
+    fun find(id: String): Station? = _stations.value.firstOrNull { it.id == id }
+        ?: seen[id] ?: _recent.value.firstOrNull { it.id == id }
+
+    /** Called only on station selection, not retries or automatic reconnection. */
+    fun recordPlayed(station: Station) {
+        val known = find(station.id) ?: station
+        _recent.value = (listOf(known) + _recent.value.filterNot { it.id == known.id }).take(20)
+        prefs.edit().putString("recent", JSONArray().apply {
+            _recent.value.forEach { put(it.toJson()) }
+        }.toString()).apply()
+    }
+
+    fun togglePinned(id: String) {
+        if (id !in _mine.value) return
+        _pinned.value = if (id in _pinned.value) _pinned.value - id else _pinned.value + id
+        prefs.edit().putStringSet("pinned", _pinned.value).apply()
+    }
+
+    fun logPlayback(message: String) {
+        val clean = message.take(220).replace(Regex("https?://\\S+"), "[stream]")
+        val entry = "${java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.MEDIUM).format(java.util.Date())} · $clean"
+        _events.value = (listOf(entry) + _events.value).take(60)
+    }
+
+    fun clearPlaybackLog() { _events.value = emptyList() }
 
     /** Saves links found for a known station (e.g. a Streema station's link once it played). */
     fun update(station: Station) {
@@ -173,7 +209,7 @@ object Library {
     /** Favourite Radios, in list order. */
     fun myStations(): List<Station> {
         val byId = _stations.value.associateBy { it.id }
-        return _mine.value.mapNotNull { byId[it] }
+        return _mine.value.sortedBy { if (it in _pinned.value) 0 else 1 }.mapNotNull { byId[it] }
     }
 
     /**
@@ -214,6 +250,7 @@ object Library {
     /** Takes the station out of Favourite Radios. */
     fun removeFromMine(id: String) {
         if (id in _mine.value) {
+            if (id in _pinned.value) togglePinned(id)
             _mine.value = _mine.value - id
             saveMine()
         }
