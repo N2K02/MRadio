@@ -165,6 +165,97 @@ object Library {
         (0 until a.length()).map { Station.fromJson(a.getJSONObject(it)) }
     }.getOrDefault(emptyList())
 
+    /**
+     * Portable, explicitly versioned backup of preferences and user-added stations.
+     * Does not include playback diagnostics, stored download URLs or private app data.
+     */
+    fun exportBackup(): String {
+        check(initialized) { "Library is not initialized" }
+        return JSONObject()
+            .put("format", "mradio-backup")
+            .put("schema", 1)
+            .put("stations", JSONArray().apply {
+                _stations.value.filterNot { it.builtIn }.forEach { put(it.toJson()) }
+            })
+            .put("favorites", JSONArray(_mine.value))
+            .put("pinned", JSONArray(_mine.value.filter { it in _pinned.value }))
+            .put("hidden", JSONObject(_hidden.value as Map<*, *>))
+            .put("recent", JSONArray().apply { _recent.value.forEach { put(it.toJson()) } })
+            .put("place", place)
+            .put("autoPlayPhone", autoPlayPhone.value)
+            .put("autoPlayAuto", autoPlayAuto.value)
+            .toString(2)
+    }
+
+    /** Validate all data before replacing saved library state. Invalid backups are rejected. */
+    @Synchronized
+    fun restoreBackup(json: String): Int {
+        check(initialized) { "Library is not initialized" }
+        require(json.length <= 1_000_000) { "Backup is too large" }
+        val root = JSONObject(json)
+        require(root.optString("format") == "mradio-backup" && root.optInt("schema") == 1) {
+            "Unsupported mRadio backup format"
+        }
+        fun strings(array: JSONArray, max: Int): List<String> {
+            require(array.length() <= max) { "Too many entries in backup" }
+            return (0 until array.length()).map { array.getString(it) }
+        }
+        val items = root.getJSONArray("stations")
+        require(items.length() <= 500) { "Too many custom stations" }
+        val restored = (0 until items.length()).map { index ->
+            val station = Station.fromJson(items.getJSONObject(index))
+            require(station.id.length in 1..150 && station.name.length in 1..160) { "Invalid station" }
+            require(station.streams.size in 1..12 &&
+                station.streams.all { url ->
+                    url.length <= 2048 && (url.startsWith("https://", true) || url.startsWith("http://", true))
+                }
+            ) { "Invalid station stream URL" }
+            station.copy(builtIn = false)
+        }.distinctBy { it.id }.filterNot { restoredStation ->
+            BuiltInStations.all.any { it.id == restoredStation.id }
+        }
+        val combined = BuiltInStations.all + restored
+        val byId = combined.map { it.id }.toSet()
+        val favorites = strings(root.getJSONArray("favorites"), 600).distinct().filter { it in byId }
+        val pins = strings(root.getJSONArray("pinned"), 600).toSet().intersect(favorites.toSet())
+        val hiddenJson = root.getJSONObject("hidden")
+        require(hiddenJson.length() <= 500) { "Too many hidden stations" }
+        val hidden = hiddenJson.keys().asSequence().associateWith { key ->
+            require(key.length <= 160) { "Invalid hidden station name" }
+            hiddenJson.getString(key).also { require(it.length <= 160) }
+        }
+        val recentJson = root.optJSONArray("recent") ?: JSONArray()
+        require(recentJson.length() <= 20) { "Too many recent stations" }
+        val recentItems = (0 until recentJson.length()).map { index ->
+            Station.fromJson(recentJson.getJSONObject(index))
+        }.filter { it.id.isNotBlank() && it.name.isNotBlank() }.distinctBy { it.id }.take(20)
+        val savedPlace = root.optString("place", Directory.MAURITIUS)
+            .takeIf { it == Directory.WORLDWIDE || it == Directory.MAURITIUS ||
+                (it.length == 2 && it.all(Char::isLetter)) } ?: Directory.MAURITIUS
+        val phoneAutoPlay = root.getBoolean("autoPlayPhone")
+        val autoAutoPlay = root.getBoolean("autoPlayAuto")
+
+        // Commit the validated snapshot together, then update observable state.
+        val edit = prefs.edit()
+            .putString("added", JSONArray().apply { restored.forEach { put(it.toJson()) } }.toString())
+            .putString("mine", JSONArray(favorites).toString())
+            .putStringSet("pinned", pins)
+            .putString("hidden", JSONObject(hidden as Map<*, *>).toString())
+            .putString("recent", JSONArray().apply { recentItems.forEach { put(it.toJson()) } }.toString())
+            .putString("place", savedPlace)
+            .putBoolean("autoPlayPhone", phoneAutoPlay)
+            .putBoolean("autoPlayAuto", autoAutoPlay)
+        require(edit.commit()) { "Could not save restored backup" }
+        _stations.value = combined
+        _mine.value = favorites
+        _pinned.value = pins
+        _hidden.value = hidden
+        _recent.value = recentItems
+        autoPlayPhone.value = phoneAutoPlay
+        autoPlayAuto.value = autoAutoPlay
+        return favorites.size
+    }
+
     private fun saveStations() {
         val a = JSONArray()
         _stations.value.filter { !it.builtIn }.forEach { a.put(it.toJson()) }
