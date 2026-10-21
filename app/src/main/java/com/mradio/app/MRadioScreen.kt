@@ -624,8 +624,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             onPlace = ::choosePlace,
                             onPickCountry = { pickCountry = true },
                         )
-                        if (true) {
-                            Row(
+                        Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End,
@@ -675,7 +674,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                     }
                                 }
                             }
-                        }
                     }
                 }
 
