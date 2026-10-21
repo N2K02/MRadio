@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -510,22 +511,24 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
                                 Icon(Icons.Rounded.Search, contentDescription = "Search stations")
                             }
-                            IconButton(onClick = { settingsMenu = true }) {
-                                Icon(Icons.Rounded.Settings, contentDescription = "Settings")
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            listOf("All stations", "Favorites", "Recent").forEach { tab ->
-                                FilterChip(
-                                    selected = homeTab == tab,
-                                    onClick = { homeTab = tab; query = "" },
-                                    label = { Text(tab) },
+                            IconButton(onClick = {
+                                homeTab = if (homeTab == "Recent") "All stations" else "Recent"
+                                query = ""
+                            }) {
+                                Icon(
+                                    if (homeTab == "Recent") Icons.Rounded.Home else Icons.Rounded.History,
+                                    contentDescription = if (homeTab == "Recent") "Back to Home" else "Recently played",
+                                    tint = if (homeTab == "Recent") MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
+                        }
+                        if (homeTab == "Recent") {
+                            Text(
+                                "Recently played",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                            )
                         }
                         if (showSearch) {
                             TextField(
