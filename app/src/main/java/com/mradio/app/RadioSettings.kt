@@ -505,6 +505,9 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.SystemUpdate, null) },
                                 modifier = Modifier.clickable { onCheckUpdates() },
                             )
+                            UpdateCard(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
                         }
                     }
                 }
