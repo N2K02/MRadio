@@ -216,6 +216,9 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
     var query by rememberSaveable { mutableStateOf("") }
     var homeTab by rememberSaveable { mutableStateOf("All stations") }
+    LaunchedEffect(homeTab) {
+        if (homeTab == "Favorites") homeTab = "All stations" // Migrate older saved tab state.
+    }
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var selectedGenre by rememberSaveable { mutableStateOf("All genres") }
     var stationSort by rememberSaveable { mutableStateOf("Default") }
@@ -303,7 +306,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val moreList = remember(stations, mine, discovered, place, hidden) {
         Library.moreStations(discovered.orEmpty(), mauritius = place == Directory.MAURITIUS)
     }
-    val visibleMine = filtered(myList)
+    // Home favourites must not disappear when filters are changed on the Search page.
+    val visibleMine = myList
     val visibleMore = filtered(moreList)
     val localResults = filtered(Library.searchLocal(query))
     val onlineResults = online?.let { filtered(it.filterNot { station -> Library.known(station) || Library.isHidden(station) }) }
