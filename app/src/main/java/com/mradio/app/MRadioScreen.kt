@@ -602,7 +602,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 }
 
                 item(key = "station-controls") {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                         if (homeTab == "All stations") {
                             TextField(
                                 value = query,
