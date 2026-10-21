@@ -527,12 +527,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                 },
                                 modifier = Modifier.size(52.dp),
                             )
-                            Text(
-                                if (homeTab == "Favorites") "Favorites" else "mRadio",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f).padding(start = 12.dp),
-                            )
+                            Spacer(Modifier.weight(1f))
                         }
                     }
                 }
