@@ -1133,11 +1133,14 @@ private fun FullPlayer(
     val sleepAt by Library.sleepAt.collectAsState()
     val info by produceState<Directory.Info?>(null, station.id) { value = Directory.info(station) }
     val since = remember(station.id) { System.currentTimeMillis() }
+    // Tick only while a sleep countdown exists, avoiding idle UI wake-ups.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(15_000)
+    LaunchedEffect(sleepAt) {
+        if (sleepAt != null) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(15_000)
+            }
         }
     }
     val uri = LocalUriHandler.current
@@ -1216,8 +1219,18 @@ private fun FullPlayer(
                 }
             }
 
-            Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
-                StationBadge(station, spinning = player.isPlaying, size = 220)
+            // Keep the artwork visually grouped, without adding animation work when paused.
+            Surface(
+                shape = RoundedCornerShape(36.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().padding(vertical = 28.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    StationBadge(station, spinning = player.isPlaying, size = 220)
+                }
             }
             Text(
                 station.name,
