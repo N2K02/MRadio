@@ -1416,8 +1416,33 @@ private fun PlaybackStatusDot(playing: Boolean, failed: Boolean) {
         playing -> Color(0xFF4CAF50)
         else -> Color(0xFFFFA726)
     }
+    // One full gentle pulse every second, shared by every visible playback indicator.
+    val pulse = rememberInfiniteTransition(label = "Playback status pulse")
+    val scale by pulse.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.22f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 500),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "Status dot scale",
+    )
+    val opacity by pulse.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 500),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "Status dot opacity",
+    )
     Box(
         Modifier.size(9.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = opacity
+            }
             .background(color, CircleShape)
             .semantics { contentDescription = label },
     )
