@@ -101,6 +101,7 @@ fun RadioSettings(
             }.getOrElse { "Restore failed: ${it.message ?: "Invalid backup"}" }
         }
     }
+    var stationStatus by remember { mutableStateOf<String?>(null) }
     val playlistExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("audio/x-mpegurl")
     ) { uri ->
@@ -141,7 +142,6 @@ fun RadioSettings(
     var stationUrl by remember { mutableStateOf("") }
     var stationTags by remember { mutableStateOf("") }
     var stationCountry by remember { mutableStateOf("MU") }
-    var stationStatus by remember { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<Station?>(null) }
     fun openStationEditor(station: Station?) {
         editingStation = station
