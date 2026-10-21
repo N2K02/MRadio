@@ -1,6 +1,9 @@
 package com.mradio.app
 
 import android.app.PendingIntent
+import android.content.ComponentName
+import android.os.Build
+import android.service.quicksettings.TileService
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -163,11 +166,13 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                RadioWidgetProvider.refresh(
-                    this@PlaybackService,
-                    current?.name,
-                    isPlaying,
-                )
+                RadioWidgetProvider.refresh(this@PlaybackService, current?.name, isPlaying)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    TileService.requestListeningState(
+                        this@PlaybackService,
+                        ComponentName(this@PlaybackService, RadioQuickTileService::class.java),
+                    )
+                }
             }
 
             // The user paused: stop trying to reconnect.
