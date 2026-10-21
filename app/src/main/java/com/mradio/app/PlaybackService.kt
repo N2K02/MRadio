@@ -301,6 +301,11 @@ class PlaybackService : MediaLibraryService() {
             stationName = icy?.name,
             genre = icy?.genre,
         )
+        val newBitrate = Library.audio.value?.bitrateKbps
+        if (listeningStartMs != 0L && newBitrate != listeningBitrateKbps) {
+            flushListening()
+            listeningBitrateKbps = newBitrate
+        }
     }
 
     /**
