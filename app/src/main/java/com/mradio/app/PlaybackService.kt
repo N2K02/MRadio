@@ -343,6 +343,24 @@ class PlaybackService : MediaLibraryService() {
         stopSelf()
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == RadioAlarm.ACTION_PLAY_ALARM) {
+            val stationId = intent.getStringExtra("stationId")
+            val station = stationId?.let { Library.find(it) }
+            if (station != null) {
+                // Start immediately so Media3 can create its foreground media notification.
+                player.setMediaItem(startStation(station))
+                player.prepare()
+                player.play()
+                Library.logPlayback("Radio alarm started · ${station.name}")
+            } else {
+                stopSelf(startId)
+            }
+            return START_NOT_STICKY
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
