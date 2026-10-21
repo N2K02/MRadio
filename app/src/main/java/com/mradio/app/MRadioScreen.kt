@@ -579,20 +579,21 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         }
                                     }
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         FilterChip(
                                             selected = stationSort == "Name",
                                             onClick = { stationSort = if (stationSort == "Name") "Default" else "Name" },
-                                            label = { Text("Sort A–Z") },
+                                            label = { Text("Sort A–Z", style = MaterialTheme.typography.labelMedium) },
                                         )
                                         FilterChip(
                                             selected = workingOnly,
                                             onClick = { workingOnly = !workingOnly },
-                                            label = { Text("Hide unavailable") },
+                                            label = { Text("Unavailable", style = MaterialTheme.typography.labelMedium) },
                                         )
+                                        Spacer(Modifier.weight(1f))
                                         TextButton(onClick = {
                                             selectedGenre = "All genres"
                                             stationSort = "Default"
@@ -864,28 +865,32 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 private fun PlaceChips(place: String, onPlace: (String) -> Unit, onPickCountry: () -> Unit) {
     val other = place != Directory.MAURITIUS && place != Directory.WORLDWIDE
     Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         FilterChip(
             selected = place == Directory.MAURITIUS,
             onClick = { onPlace(Directory.MAURITIUS) },
-            label = { Text("Mauritius") },
-            leadingIcon = { Icon(Icons.Rounded.LocationOn, null, Modifier.size(18.dp)) },
+            modifier = Modifier.weight(1f),
+            label = { Text("Mauritius", maxLines = 1, style = MaterialTheme.typography.labelMedium) },
         )
         FilterChip(
             selected = place == Directory.WORLDWIDE,
             onClick = { onPlace(Directory.WORLDWIDE) },
-            label = { Text("Worldwide") },
-            leadingIcon = { Icon(Icons.Rounded.Public, null, Modifier.size(18.dp)) },
+            modifier = Modifier.weight(1f),
+            label = { Text("Worldwide", maxLines = 1, style = MaterialTheme.typography.labelMedium) },
         )
         FilterChip(
             selected = other,
             onClick = onPickCountry,
-            label = { Text(if (other) "${flagEmoji(place)}  ${countryName(place)}" else "Country") },
-            trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, null, Modifier.size(18.dp)) },
+            modifier = Modifier.weight(1f),
+            label = {
+                Text(if (other) countryName(place) else "Country",
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelMedium)
+            },
+            trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, null, Modifier.size(16.dp)) },
         )
     }
 }
