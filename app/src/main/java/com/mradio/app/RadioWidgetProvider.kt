@@ -33,17 +33,9 @@ class RadioWidgetProvider : AppWidgetProvider() {
                     if (controller != null) {
                         when (intent.action) {
                             ACTION_NEXT -> {
-                                if (controller.hasNextMediaItem()) controller.seekToNextMediaItem()
-                                else {
-                                    val order = Library.playOrder(controller.currentMediaItem?.mediaId)
-                                    val index = order.indexOfFirst { it.id == controller.currentMediaItem?.mediaId }
-                                    val next = order.getOrNull((index + 1) % order.size.coerceAtLeast(1))
-                                    if (next != null) {
-                                        controller.setMediaItem(MediaItem.Builder().setMediaId(next.id).build())
-                                        controller.prepare()
-                                        controller.play()
-                                    }
-                                }
+                                // StationSwitcher implements this for Android Auto and Bluetooth too.
+                                // Do not construct our own queue or duplicate station selection logic.
+                                controller.seekToNextMediaItem()
                             }
                             ACTION_TOGGLE -> {
                                 if (controller.isPlaying) controller.pause()
@@ -54,14 +46,17 @@ class RadioWidgetProvider : AppWidgetProvider() {
                                         if (station != null) {
                                             controller.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
                                             controller.prepare()
+                                            controller.play()
                                         }
-                                    } else if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
-                                    if (controller.mediaItemCount > 0) controller.play()
+                                    } else {
+                                        if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
+                                        controller.play()
+                                    }
                                 }
                             }
                         }
-                        val title = controller.currentMediaItem?.mediaMetadata?.artist?.toString()
-                            ?: controller.currentMediaItem?.mediaId?.let { Library.find(it)?.name }
+                        val title = controller.currentMediaItem?.mediaId?.let { Library.find(it)?.name }
+                            ?: controller.currentMediaItem?.mediaMetadata?.title?.toString()
                         refresh(context, title, controller.isPlaying)
                     }
                 } finally {
@@ -118,8 +113,8 @@ class RadioWidgetProvider : AppWidgetProvider() {
         fun refreshFromPlayer(context: Context) {
             withController(context) { controller ->
                 if (controller != null) {
-                    val name = controller.currentMediaItem?.mediaMetadata?.artist?.toString()
-                        ?: controller.currentMediaItem?.mediaId?.let { Library.find(it)?.name }
+                    val name = controller.currentMediaItem?.mediaId?.let { Library.find(it)?.name }
+                        ?: controller.currentMediaItem?.mediaMetadata?.title?.toString()
                     refresh(context, name, controller.isPlaying)
                 }
             }
