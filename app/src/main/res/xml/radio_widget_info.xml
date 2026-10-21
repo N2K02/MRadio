@@ -7,5 +7,4 @@
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/radio_widget"
     android:resizeMode="horizontal"
-    android:widgetCategory="home_screen"
-    android:description="@string/radio_widget_description" />
+    android:widgetCategory="home_screen" />
