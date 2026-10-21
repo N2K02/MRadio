@@ -74,6 +74,7 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var session: MediaLibrarySession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val searchResults = HashMap<String, List<Station>>()
+    private var autoStartedForCar = false
 
     // Fallback state for the station being played.
     private var current: Station? = null
@@ -646,6 +647,23 @@ class PlaybackService : MediaLibraryService() {
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<MediaItem>> {
+            // Android Auto's projected media browser uses the Gearhead package.
+            // Do not auto-start for ordinary phone media browsers or repeated root requests.
+            if (browser.packageName == "com.google.android.projection.gearhead" &&
+                Library.autoPlayAuto.value && !autoStartedForCar &&
+                player.playbackState == Player.STATE_IDLE && player.mediaItemCount == 0
+            ) {
+                val station = Library.lastPlayed?.let(Library::find)
+                    ?: Library.myStations().firstOrNull()
+                if (station != null) {
+                    autoStartedForCar = true
+                    scope.launch {
+                        player.setMediaItem(startStation(station))
+                        player.prepare()
+                        player.play()
+                    }
+                }
+            }
             val extras = Bundle().apply {
                 putBoolean(CONTENT_STYLE_SUPPORTED, true)
                 putInt(CONTENT_STYLE_BROWSABLE_HINT, CONTENT_STYLE_LIST)
