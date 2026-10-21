@@ -407,6 +407,20 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     announce("No app available for sharing", null)
                 }
             },
+            onCopyInfo = {
+                val details = buildString {
+                    appendLine(station.name)
+                    appendLine("Country: ${countryName(station.country)}")
+                    if (station.tags.isNotBlank()) appendLine("Genres: ${station.tags}")
+                    if (station.location.isNotBlank()) appendLine("Location: ${station.location}")
+                    appendLine("Stream links: ${station.streams.size}")
+                    val url = Library.orderedStreams(station).firstOrNull()
+                    if (url != null) append("Preferred stream: ").append(url)
+                }.trim()
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("Station information", details))
+                announce("Station information copied", null)
+            },
             onCopy = {
                 val url = Library.orderedStreams(station).firstOrNull()
                 if (url != null) {
@@ -908,21 +922,33 @@ private fun StationInfoDialog(
     val lastWorked = Library.lastWorked(station.id)
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Rounded.ErrorOutline, null, tint = MaterialTheme.colorScheme.error) },
-        title = { Text("${station.name} isn't available") },
+        icon = {
+            Icon(
+                if (failedAt == null) Icons.Rounded.Info else Icons.Rounded.ErrorOutline,
+                null,
+                tint = if (failedAt == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(if (failedAt == null) station.name else "${station.name} isn't available") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "None of its stream links answered, including the backup links MRadio looked up online. " +
-                        "The station may be off air, or it may have moved to a new link.",
-                )
+                if (failedAt != null) {
+                    Text("All known streams failed. The station may be off air or have changed its address.")
+                } else {
+                    Text("Country: ${countryName(station.country)}")
+                    if (station.tags.isNotBlank()) Text("Genres: ${station.tags}")
+                    if (station.location.isNotBlank()) Text("Location: ${station.location}")
+                    Text("Available stream links: ${station.streams.size}")
+                }
                 failedAt?.let { Text("Failed: ${DateUtils.getRelativeTimeSpanString(it)}", style = MaterialTheme.typography.bodySmall) }
                 lastWorked?.let { Text("Last worked: ${DateUtils.getRelativeTimeSpanString(it)}", style = MaterialTheme.typography.bodySmall) }
                 Spacer(Modifier.size(4.dp))
-                OutlinedButton(onClick = onTryAgain, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Try again")
+                if (failedAt != null) {
+                    OutlinedButton(onClick = onTryAgain, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Try again")
+                    }
                 }
                 if (isMine) {
                     OutlinedButton(onClick = onRemoveFromMine, modifier = Modifier.fillMaxWidth()) {
@@ -934,7 +960,7 @@ private fun StationInfoDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Keep") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
 }
 
@@ -1070,6 +1096,7 @@ private fun StationRow(
     onInfo: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
+    onCopyInfo: () -> Unit,
     isPinned: Boolean = false,
     onPin: (() -> Unit)? = null,
     onMoveUp: (() -> Unit)? = null,
@@ -1134,6 +1161,10 @@ private fun StationRow(
                             text = { Text("Share station") },
                             onClick = { menuOpen = false; onShare() },
                             leadingIcon = { Icon(Icons.Rounded.Share, null) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Copy station information") },
+                            onClick = { menuOpen = false; onCopyInfo() },
                         )
                         DropdownMenuItem(
                             text = { Text("Copy stream URL") },
