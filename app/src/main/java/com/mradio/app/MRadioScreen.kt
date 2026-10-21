@@ -499,6 +499,13 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             label = { Text("Settings") },
                             alwaysShowLabel = true,
                         )
+                        NavigationBarItem(
+                            selected = false,
+                            onClick = onExit,
+                            icon = { Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Quit mRadio") },
+                            label = { Text("Quit") },
+                            alwaysShowLabel = true,
+                        )
                     }
                 }
                 }
