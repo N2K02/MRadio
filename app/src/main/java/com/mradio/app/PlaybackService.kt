@@ -722,7 +722,10 @@ class PlaybackService : MediaLibraryService() {
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = future {
             val found = searchResults[query] ?: searchStations(query).also { searchResults[query] = it }
-            LibraryResult.ofItemList(pageOf(found.map { browseItem(it, artwork = false) }, page, pageSize), params)
+            // Supply artwork for visible search results as well as favourites.
+            // Pagination happens before artwork generation to avoid work for off-screen results.
+            val visible = pageOf(found, page, pageSize)
+            LibraryResult.ofItemList(visible.map { browseItem(it, artwork = true) }, params)
         }
 
         /** Every "play this" request (app, Auto, voice) arrives here with just a station id or a query. */
