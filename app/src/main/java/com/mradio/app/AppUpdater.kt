@@ -131,7 +131,7 @@ object AppUpdater {
         job = scope.launch {
             _state.value = State.Checking
             val result = runCatching {
-                val experimental = if (_experimentalEnabled.value) latestExperimental() else null
+                val experimental = if (_experimentalEnabled.value) runCatching { latestExperimental() }.getOrNull() else null
                 experimental?.takeIf { it.versionCode > installedVersionCode } ?: latestRelease()
             }
             prefs.edit().putLong("lastCheck", System.currentTimeMillis()).apply()
@@ -281,7 +281,8 @@ object AppUpdater {
             if (run.optJSONObject("head_repository")?.optString("full_name") != repo) continue
             val runId = run.optLong("id")
             val number = run.optLong("run_number")
-            if (runId <= 0L || number <= installedVersionCode) continue
+            val code = 100000L + number
+            if (runId <= 0L || number <= 0L || code <= installedVersionCode) continue
             val artifacts = requestJson(
                 "https://api.github.com/repos/$repo/actions/runs/$runId/artifacts"
             ).optJSONArray("artifacts") ?: continue
@@ -294,7 +295,7 @@ object AppUpdater {
                 return@withContext Release(
                     tag = "experimental-$runId",
                     versionName = "Experimental #$number",
-                    versionCode = number,
+                    versionCode = code,
                     notes = listOf("Successful pull request build #$number", "Experimental — not a stable release"),
                     apkUrl = "https://nightly.link/$repo/actions/runs/$runId/$name.zip",
                     apkName = "$appName-experimental-$runId.apk",
