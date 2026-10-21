@@ -23,10 +23,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,6 +49,8 @@ fun RadioSettings(
     onCheckUpdates: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
+    val carAutoPlay by Library.autoPlayAuto.collectAsState()
     var page by rememberSaveable { mutableStateOf("Settings") }
     fun back() {
         if (page == "Settings") onDismiss() else page = "Settings"
@@ -55,6 +59,7 @@ fun RadioSettings(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        BackHandler(enabled = page != "Settings") { page = "Settings" }
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Scaffold(
                 topBar = {
@@ -80,7 +85,7 @@ fun RadioSettings(
                         if (current == "Settings") {
                             ListItem(
                                 headlineContent = { Text("Playback & audio") },
-                                supportingContent = { Text("Equalizer and audio controls") },
+                                supportingContent = { Text("Auto-play and equalizer") },
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { page = "Playback & audio" },
                             )
@@ -92,6 +97,23 @@ fun RadioSettings(
                                 modifier = Modifier.clickable { page = "About & updates" },
                             )
                         } else if (current == "Playback & audio") {
+                            ListItem(
+                                headlineContent = { Text("Auto-play on phone") },
+                                supportingContent = { Text("Play the last station when opening the app") },
+                                trailingContent = {
+                                    Switch(checked = phoneAutoPlay, onCheckedChange = Library::setAutoPlayPhone)
+                                },
+                                modifier = Modifier.clickable { Library.setAutoPlayPhone(!phoneAutoPlay) },
+                            )
+                            ListItem(
+                                headlineContent = { Text("Auto-play in Android Auto") },
+                                supportingContent = { Text("Resume the last station when Android Auto connects") },
+                                trailingContent = {
+                                    Switch(checked = carAutoPlay, onCheckedChange = Library::setAutoPlayAuto)
+                                },
+                                modifier = Modifier.clickable { Library.setAutoPlayAuto(!carAutoPlay) },
+                            )
+                            HorizontalDivider()
                             ListItem(
                                 headlineContent = { Text("Equalizer") },
                                 supportingContent = { Text("Adjust sound settings") },
