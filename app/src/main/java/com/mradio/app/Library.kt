@@ -436,6 +436,54 @@ object Library {
         saveStations()
     }
 
+    /** Export custom streams in a broadly compatible M3U playlist. */
+    fun exportCustomPlaylist(): String = buildString {
+        appendLine("#EXTM3U")
+        customStations().forEach { station ->
+            station.streams.firstOrNull()?.let { url ->
+                append("#EXTINF:-1,").appendLine(station.name.replace('\n', ' ').replace('\r', ' '))
+                appendLine(url)
+            }
+        }
+    }
+
+    /**
+     * Import local M3U playlists only. Reject malformed or oversized input before saving
+     * anything; avoid duplicate entries based on existing custom stream URLs.
+     */
+    @Synchronized
+    fun importCustomPlaylist(content: String): Int {
+        check(initialized) { "Library is not initialized" }
+        require(content.length <= 200_000) { "Playlist is too large" }
+        val entries = mutableListOf<Pair<String, String>>()
+        var upcomingName: String? = null
+        content.lineSequence().forEach { raw ->
+            val line = raw.trim()
+            if (line.startsWith("#EXTINF:", true)) {
+                upcomingName = line.substringAfter(',', "").trim().take(100).ifBlank { null }
+            } else if (line.isNotEmpty() && !line.startsWith("#")) {
+                require(entries.size < 500) { "Too many stations in playlist" }
+                val parsed = android.net.Uri.parse(line)
+                require(line.length <= 2048 &&
+                    (line.startsWith("https://", true) || line.startsWith("http://", true)) &&
+                    !parsed.host.isNullOrBlank() && parsed.userInfo == null
+                ) { "Invalid stream URL in playlist" }
+                val title = upcomingName
+                    ?: parsed.host?.take(100)
+                    ?: "Imported station"
+                entries.add(title to line)
+                upcomingName = null
+            }
+        }
+        val existing = customStations().flatMap { it.streams }.toMutableSet()
+        val fresh = entries.distinctBy { it.second }.filter { it.second !in existing }
+        require(customStations().size + fresh.size <= 500) { "Custom station limit reached" }
+        fresh.forEach { (name, url) ->
+            saveCustomStation(null, name, url, "", "MU")
+        }
+        return fresh.size
+    }
+
     /** Adds the station to Favourite Radios (at the end). Returns the id it is kept under. */
     fun addToMine(station: Station): String {
         val keep = knownVersion(station) ?: station.copy(builtIn = false).also {
