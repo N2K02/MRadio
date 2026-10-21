@@ -162,6 +162,14 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
 
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                RadioWidgetProvider.refresh(
+                    this@PlaybackService,
+                    current?.name,
+                    isPlaying,
+                )
+            }
+
             // The user paused: stop trying to reconnect.
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) cancelRetry()
@@ -339,6 +347,7 @@ class PlaybackService : MediaLibraryService() {
         setSleepTimer(0)
         player.stop()
         player.clearMediaItems()
+        RadioWidgetProvider.refresh(this, null, false)
         AppExit.request()
         stopSelf()
     }
@@ -391,6 +400,7 @@ class PlaybackService : MediaLibraryService() {
         wasPlaying = false
         playedBefore = false
         cancelRetry()
+        RadioWidgetProvider.refresh(this, station.name, false)
         Library.lastPlayed = station.id
         Library.audio.value = null
         lastSong = null
