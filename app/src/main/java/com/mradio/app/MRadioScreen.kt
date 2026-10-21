@@ -518,7 +518,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 item(key = "home-head") {
                     Column(
                         modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = 20.dp, top = 4.dp, bottom = 12.dp),
+                            .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Row(
