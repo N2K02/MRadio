@@ -107,7 +107,7 @@ fun RadioSettings(
                             )
                             ListItem(
                                 headlineContent = { Text("Auto-play in Android Auto") },
-                                supportingContent = { Text("Resume the last station when Android Auto connects") },
+                                supportingContent = { Text("Allow resuming the last station when Android Auto requests playback") },
                                 trailingContent = {
                                     Switch(checked = carAutoPlay, onCheckedChange = Library::setAutoPlayAuto)
                                 },
