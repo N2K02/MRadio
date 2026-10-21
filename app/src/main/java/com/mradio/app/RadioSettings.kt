@@ -68,6 +68,7 @@ fun RadioSettings(
     onEqualizer: () -> Unit,
     onCheckUpdates: () -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
@@ -162,39 +163,25 @@ fun RadioSettings(
         stationStatus = null
         stationEditorOpen = true
     }
-    fun back() {
-        if (page == "Settings") onDismiss() else page = "Settings"
-    }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        BackHandler(enabled = page != "Settings") { page = "Settings" }
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    // The settings content is embedded in the parent Scaffold, so bottom navigation
+    // stays visible. System Back returns to the main Settings list from subsections.
+    BackHandler(enabled = page != "Settings") { page = "Settings" }
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Scaffold(
                 topBar = {
-                    TopAppBar(
-                        title = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Settings,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(22.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                                Text(if (page == "Settings") "Settings" else page)
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                        navigationIcon = {
-                            IconButton(onClick = ::back) {
-                                Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
-                            }
-                        },
-                    )
+                    if (page != "Settings") {
+                        TopAppBar(
+                            title = { Text(page) },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.background,
+                            ),
+                            navigationIcon = {
+                                IconButton(onClick = { page = "Settings" }) {
+                                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Back to Settings")
+                                }
+                            },
+                        )
+                    }
                 },
             ) { padding ->
                 AnimatedContent(
@@ -595,5 +582,4 @@ fun RadioSettings(
                 dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
             )
         }
-    }
 }
