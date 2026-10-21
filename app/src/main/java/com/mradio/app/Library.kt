@@ -86,6 +86,8 @@ object Library {
             saveMine()
             prefs.edit().remove("favourites").apply()
         }
+        autoPlayPhone.value = prefs.getBoolean("autoPlayPhone", false)
+        autoPlayAuto.value = prefs.getBoolean("autoPlayAuto", true)
         initialized = true
     }
 
@@ -286,6 +288,20 @@ object Library {
     var place: String
         get() = prefs.getString("place", Directory.MAURITIUS) ?: Directory.MAURITIUS
         set(value) = prefs.edit().putString("place", value).apply()
+
+    /** Phone launch defaults off; Android Auto browser connection defaults on. */
+    val autoPlayPhone = MutableStateFlow(false)
+    val autoPlayAuto = MutableStateFlow(true)
+
+    fun setAutoPlayPhone(enabled: Boolean) {
+        autoPlayPhone.value = enabled
+        prefs.edit().putBoolean("autoPlayPhone", enabled).apply()
+    }
+
+    fun setAutoPlayAuto(enabled: Boolean) {
+        autoPlayAuto.value = enabled
+        prefs.edit().putBoolean("autoPlayAuto", enabled).apply()
+    }
 
     var lastPlayed: String?
         get() = prefs.getString("lastPlayed", null)
