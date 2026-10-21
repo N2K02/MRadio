@@ -51,6 +51,56 @@ object Library {
     /** The playing stream's sound quality, filled in by the player (same process). */
     val audio = MutableStateFlow<AudioInfo?>(null)
 
+    /** Persisted listening time and approximate stream bytes; unknown bitrate is excluded. */
+    data class ListeningStats(
+        val listeningMs: Long = 0L,
+        val wifiEstimatedBytes: Long = 0L,
+        val mobileEstimatedBytes: Long = 0L,
+        val unknownNetworkEstimatedBytes: Long = 0L,
+        val unestimatedMs: Long = 0L,
+    )
+    private val _listeningStats = MutableStateFlow(ListeningStats())
+    val listeningStats: StateFlow<ListeningStats> = _listeningStats
+
+    /**
+     * Called only while actual playback is active, with time measured using elapsed realtime.
+     * No arbitrary default bitrate: missing bitrate stays unestimated.
+     * Radio data consumption is estimated, not a measured network-byte total.
+     */
+    fun recordListening(durationMs: Long, bitrateKbps: Int?, transport: String) {
+        if (durationMs <= 0L || durationMs > 15_000L) return
+        val previous = _listeningStats.value
+        val bytes = bitrateKbps?.takeIf { it in 8..2_000 }
+            ?.let { it.toLong() * durationMs / 8L } ?: 0L
+        val next = previous.copy(
+            listeningMs = previous.listeningMs + durationMs,
+            wifiEstimatedBytes = previous.wifiEstimatedBytes + if (transport == "wifi") bytes else 0L,
+            mobileEstimatedBytes = previous.mobileEstimatedBytes + if (transport == "mobile") bytes else 0L,
+            unknownNetworkEstimatedBytes = previous.unknownNetworkEstimatedBytes +
+                if (transport != "wifi" && transport != "mobile") bytes else 0L,
+            unestimatedMs = previous.unestimatedMs + if (bitrateKbps == null || bitrateKbps !in 8..2_000) durationMs else 0L,
+        )
+        _listeningStats.value = next
+        prefs.edit()
+            .putLong("stats:listeningMs", next.listeningMs)
+            .putLong("stats:wifiBytes", next.wifiEstimatedBytes)
+            .putLong("stats:mobileBytes", next.mobileEstimatedBytes)
+            .putLong("stats:otherBytes", next.unknownNetworkEstimatedBytes)
+            .putLong("stats:unestimatedMs", next.unestimatedMs)
+            .apply()
+    }
+
+    fun clearListeningStats() {
+        _listeningStats.value = ListeningStats()
+        prefs.edit()
+            .remove("stats:listeningMs")
+            .remove("stats:wifiBytes")
+            .remove("stats:mobileBytes")
+            .remove("stats:otherBytes")
+            .remove("stats:unestimatedMs")
+            .apply()
+    }
+
     /** When the sleep timer stops the radio (ms), or null. Set by the player. */
     val sleepAt = MutableStateFlow<Long?>(null)
 
@@ -98,6 +148,13 @@ object Library {
             saveMine()
             prefs.edit().remove("favourites").apply()
         }
+        _listeningStats.value = ListeningStats(
+            listeningMs = prefs.getLong("stats:listeningMs", 0L),
+            wifiEstimatedBytes = prefs.getLong("stats:wifiBytes", 0L),
+            mobileEstimatedBytes = prefs.getLong("stats:mobileBytes", 0L),
+            unknownNetworkEstimatedBytes = prefs.getLong("stats:otherBytes", 0L),
+            unestimatedMs = prefs.getLong("stats:unestimatedMs", 0L),
+        )
         autoPlayPhone.value = prefs.getBoolean("autoPlayPhone", false)
         autoPlayAuto.value = prefs.getBoolean("autoPlayAuto", true)
         initialized = true
