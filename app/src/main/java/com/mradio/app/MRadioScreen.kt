@@ -617,18 +617,25 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         Icon(Icons.Rounded.GraphicEq, contentDescription = null)
                                     }
                                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                        Text(if (player.isPlaying) "● LIVE RADIO" else "NOW PLAYING",
+                                        Text("NOW PLAYING",
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.labelSmall)
                                         Text(current?.name ?: "Choose a station",
                                             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(
-                                            if (current == null) "Select a radio below" else statusText(current, player, currentBroken),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (current != null) {
+                                                PlaybackStatusDot(playing = player.isPlaying, failed = player.failed)
+                                                Spacer(Modifier.width(7.dp))
+                                            }
+                                            Text(
+                                                if (current == null) "Select a radio below" else statusText(current, player, currentBroken),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
                                     }
                                     if (current != null) IconButton(onClick = {
                                         if (Library.inMine(current)) removeFromMine(current) else addToMine(current)
@@ -1269,9 +1276,8 @@ private fun StationRow(
                 Text(station.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
                     modifier = Modifier.weight(1f, fill = false))
-                if (isCurrent && isPlayRequested) {
-                    Text("LIVE", style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary)
+                if (isCurrent) {
+                    PlaybackStatusDot(playing = isPlaying, failed = isBroken)
                 }
             }
         },
@@ -1397,6 +1403,26 @@ private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
     }
 }
 
+/** Shared playback indicator for Home, favourite rows, mini-player and full player. */
+@Composable
+private fun PlaybackStatusDot(playing: Boolean, failed: Boolean) {
+    val label = when {
+        failed -> "Playback error"
+        playing -> "Playing"
+        else -> "Paused"
+    }
+    val color = when {
+        failed -> Color(0xFFEF5350)
+        playing -> Color(0xFF4CAF50)
+        else -> Color(0xFFFFA726)
+    }
+    Box(
+        Modifier.size(9.dp)
+            .background(color, CircleShape)
+            .semantics { contentDescription = label },
+    )
+}
+
 private fun statusText(station: Station, player: PlayerUi, broken: Boolean): String = when {
     player.failed && broken -> "Not available right now"
     player.failed -> "Can't reach this station right now"
@@ -1419,16 +1445,6 @@ private fun NowPlayingBar(
     onNext: () -> Unit,
 ) {
     val broken by Library.broken.collectAsState()
-    val indicatorColor = when {
-        player.failed -> Color(0xFFEF5350)
-        player.isPlaying -> Color(0xFF4CAF50)
-        else -> Color(0xFFFFA726)
-    }
-    val indicatorLabel = when {
-        player.failed -> "Playback error"
-        player.isPlaying -> "Playing"
-        else -> "Paused"
-    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(26.dp),
@@ -1460,13 +1476,8 @@ private fun NowPlayingBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(9.dp)
-                            .background(indicatorColor, CircleShape)
-                            .semantics { contentDescription = indicatorLabel },
-                    )
+                    PlaybackStatusDot(playing = player.isPlaying, failed = player.failed)
+                    Spacer(Modifier.width(8.dp))
                     androidx.compose.animation.AnimatedContent(
                         targetState = statusText(station, player, station.id in broken),
                         transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
@@ -1650,14 +1661,20 @@ private fun FullPlayer(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).padding(top = 16.dp),
             )
-            Text(
-                statusText(station, player, isBroken),
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (player.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            )
+            ) {
+                PlaybackStatusDot(playing = player.isPlaying, failed = player.failed)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    statusText(station, player, isBroken),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (player.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
+            }
             if (player.failed) {
                 TextButton(onClick = onInfo, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                     Icon(Icons.Rounded.Info, null, Modifier.size(18.dp))
