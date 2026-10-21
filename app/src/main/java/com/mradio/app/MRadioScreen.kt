@@ -8,6 +8,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -855,6 +856,13 @@ private fun StationRow(
     onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    // Only the selected row animates; all other rows remain static and inexpensive.
+    val rowColor by animateColorAsState(
+        targetValue = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(durationMillis = 240),
+        label = "Station selection",
+    )
     ListItem(
         headlineContent = {
             Text(station.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
@@ -908,10 +916,10 @@ private fun StationRow(
             }
         },
         colors = ListItemDefaults.colors(
-            containerColor = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+            containerColor = rowColor,
         ),
         modifier = modifier
-            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick),
     )
