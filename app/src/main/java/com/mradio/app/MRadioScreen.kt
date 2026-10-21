@@ -57,7 +57,6 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -206,7 +205,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val stations by Library.stations.collectAsState()
     val mine by Library.mine.collectAsState()
     val pinned by Library.pinned.collectAsState()
-    val recent by Library.recent.collectAsState()
     val broken by Library.broken.collectAsState()
     val hidden by Library.hidden.collectAsState()
     val player = rememberPlayerUi(controller)
@@ -528,17 +526,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
                                 Icon(Icons.Rounded.Search, contentDescription = "Search stations")
                             }
-                            IconButton(onClick = {
-                                homeTab = if (homeTab == "Recent") "All stations" else "Recent"
-                                query = ""
-                            }) {
-                                Icon(
-                                    if (homeTab == "Recent") Icons.Rounded.Home else Icons.Rounded.History,
-                                    contentDescription = if (homeTab == "Recent") "Back to Home" else "Recently played",
-                                    tint = if (homeTab == "Recent") MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
+
                         }
                         if (showSearch) {
                             TextField(
@@ -692,13 +680,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     items(visibleMine, key = { "favorites-" + it.id }) {
                         StationItem(it, true, visibleMine, Modifier.animateItem())
                     }
-                } else if (homeTab == "Recent" && query.isBlank()) {
-                    header("Recently played")
-                    val recentVisible = recent.filterNot { Library.isHidden(it) }
-                    if (recentVisible.isEmpty()) message("Stations you play will appear here.")
-                    items(recentVisible, key = { "history-" + it.id }) {
-                        StationItem(it, false, recentVisible, Modifier.animateItem())
-                    }
+
                 } else if (query.isBlank()) {
                     header(
                         "Favourite Radios",
