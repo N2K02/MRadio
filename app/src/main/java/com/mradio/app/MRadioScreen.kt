@@ -138,6 +138,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -515,11 +516,22 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            // Use the same branding as the installed launcher icon.
+                            AndroidView(
+                                factory = { ctx ->
+                                    android.widget.ImageView(ctx).apply {
+                                        setImageDrawable(ctx.packageManager.getApplicationIcon(ctx.packageName))
+                                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                                        contentDescription = "mRadio"
+                                    }
+                                },
+                                modifier = Modifier.size(52.dp),
+                            )
                             Text(
-                                "mRadio",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f),
+                                if (homeTab == "Favorites") "Favorites" else "mRadio",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f).padding(start = 12.dp),
                             )
                         }
                     }
