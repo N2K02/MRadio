@@ -759,13 +759,20 @@ class PlaybackService : MediaLibraryService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = future {
-            // Android Auto and the system decide when to request resumption.
-            // A browser connection alone must never start audio.
-            val station = Library.lastPlayed?.let { resolve(it) }
-                ?: Library.myStations().firstOrNull()
-                ?: Library.stations.value.firstOrNull()
-            val items = if (station != null) listOf(startStation(station)) else emptyList()
-            MediaSession.MediaItemsWithStartPosition(items, 0, C.TIME_UNSET)
+            // Android Auto may request resumption after connecting. Respect its
+            // separate opt-in preference without affecting phone or Bluetooth controls.
+            val isAndroidAuto = controller.packageName == "com.google.android.projection.gearhead"
+            if (isAndroidAuto && !Library.autoPlayAuto.value) {
+                MediaSession.MediaItemsWithStartPosition(emptyList(), 0, C.TIME_UNSET)
+            } else {
+                // A browser connection alone never starts audio. Only the media
+                // controller's explicit resumption request can restore a station.
+                val station = Library.lastPlayed?.let { resolve(it) }
+                    ?: Library.myStations().firstOrNull()
+                    ?: Library.stations.value.firstOrNull()
+                val items = if (station != null) listOf(startStation(station)) else emptyList()
+                MediaSession.MediaItemsWithStartPosition(items, 0, C.TIME_UNSET)
+            }
         }
     }
 
