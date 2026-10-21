@@ -59,6 +59,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- User adds this tile from Android's Quick Settings editor. -->
+        <service
+            android:name=".RadioQuickTileService"
+            android:label="mRadio"
+            android:icon="@drawable/ic_quick_radio"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Alarm receiver is explicitly targeted; not accessible to other apps. -->
         <receiver android:name=".RadioAlarmReceiver" android:exported="false" />
 
