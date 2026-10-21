@@ -1575,6 +1575,7 @@ private fun FullPlayer(
     onSleep: (Int) -> Unit,
 ) {
     val audio by Library.audio.collectAsState()
+    var detailsExpanded by rememberSaveable(station.id) { mutableStateOf(false) }
     val sleepAt by Library.sleepAt.collectAsState()
     val info by produceState<Directory.Info?>(null, station.id) { value = Directory.info(station) }
     val since = remember(station.id) { System.currentTimeMillis() }
@@ -1803,13 +1804,45 @@ private fun FullPlayer(
                 )
             }
 
-            // Details
+            // Keep the player focused on playback; reveal metadata only on demand.
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(28.dp),
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
-                Column(Modifier.padding(vertical = 8.dp)) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Station details", style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold)
+                            Text(
+                                listOfNotNull(
+                                    (info?.country?.takeIf { it.length == 2 }
+                                        ?: station.country.takeIf { it.length == 2 })?.let { countryName(it) },
+                                    soundQuality(audio, info).takeIf { it != "Shown once the stream plays" },
+                                ).joinToString(" · ").ifBlank { "Country, audio and stream information" },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        TextButton(onClick = { detailsExpanded = !detailsExpanded }) {
+                            Text(if (detailsExpanded) "Less" else "More")
+                            Icon(
+                                if (detailsExpanded) Icons.Rounded.KeyboardArrowUp
+                                else Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    AnimatedVisibility(visible = detailsExpanded) {
+                        Column {
+                            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val i = info
                     val country = i?.country?.takeIf { it.length == 2 } ?: station.country.takeIf { it.length == 2 }
                     country?.let { DetailRow(Icons.Rounded.Public, "Country", "${flagEmoji(it)}  ${countryName(it)}") }
@@ -1840,8 +1873,6 @@ private fun FullPlayer(
                             modifier = Modifier.padding(horizontal = 8.dp),
                         ) { Text("Open the station's website") }
                     }
-                }
-            }
             info?.description?.ifBlank { null }?.let {
                 Text(
                     it,
@@ -1849,6 +1880,10 @@ private fun FullPlayer(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
+            }
+                        }
+                    }
+                }
             }
             Spacer(Modifier.size(24.dp))
         }
