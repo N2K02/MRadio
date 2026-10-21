@@ -215,7 +215,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
     var query by rememberSaveable { mutableStateOf("") }
     var homeTab by rememberSaveable { mutableStateOf("All stations") }
-    var showSearch by rememberSaveable { mutableStateOf(false) }
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var selectedGenre by rememberSaveable { mutableStateOf("All genres") }
     var stationSort by rememberSaveable { mutableStateOf("Default") }
@@ -522,10 +521,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f),
                             )
-                            IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
-                                Icon(Icons.Rounded.Search, contentDescription = "Search stations")
-                            }
-
                         }
                     }
                 }
@@ -601,7 +596,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
                 item(key = "station-controls") {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        if (showSearch) {
+                        if (homeTab == "All stations") {
                             TextField(
                                 value = query,
                                 onValueChange = { query = it },
