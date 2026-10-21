@@ -1191,7 +1191,7 @@ private fun StationRow(
 ) {
     // Only the selected row animates; all other rows remain static and inexpensive.
     val rowColor by animateColorAsState(
-        targetValue = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer
+        targetValue = if (isCurrent) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surfaceContainerLow,
         animationSpec = tween(durationMillis = 240),
         label = "Station selection",
@@ -1217,7 +1217,7 @@ private fun StationRow(
         leadingContent = { StationBadge(station, spinning = isPlaying) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClick) {
+                FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
                     Icon(
                         if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (isPlaying) "Pause ${station.name}" else "Play ${station.name}",
@@ -1275,8 +1275,8 @@ private fun StationRow(
             containerColor = rowColor,
         ),
         modifier = modifier
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
     )
 }
