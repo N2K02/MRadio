@@ -16,10 +16,10 @@ on:
 permissions:
   contents: write
 
-# Cancel stale builds of the same PR; never cancel a main release build.
+# Cancel superseded builds for the same PR or main branch; each PR is independent.
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'release' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 env:
   APP: MRadio
