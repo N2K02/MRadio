@@ -366,8 +366,21 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
+                Column(Modifier.navigationBarsPadding()) {
+                    if (homeTab != "All stations" && current != null) {
+                        NowPlayingBar(
+                            station = current,
+                            player = player,
+                            isMine = Library.inMine(current),
+                            onOpen = { playerOpen = true },
+                            onHeart = { addToMine(current) },
+                            onPlayPause = { if (player.failed) retry(current) else playOrPause(current, emptyList()) },
+                            onPrevious = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
+                            onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
+                        )
+                    }
                 Row(
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                    modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
@@ -390,6 +403,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             Text("Settings", style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                }
                 }
             },
         ) { padding ->
