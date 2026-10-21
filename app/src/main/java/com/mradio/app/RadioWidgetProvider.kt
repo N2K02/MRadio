@@ -30,7 +30,7 @@ class RadioWidgetProvider : AppWidgetProvider() {
             val pending = goAsync()
             val finished = java.util.concurrent.atomic.AtomicBoolean(false)
             val handler = android.os.Handler(android.os.Looper.getMainLooper())
-            val finish = {
+            val finish = Runnable {
                 if (finished.compareAndSet(false, true)) pending.finish()
             }
             // Broadcast receivers have a short execution window. Never leave goAsync pending
@@ -72,12 +72,12 @@ class RadioWidgetProvider : AppWidgetProvider() {
                 } catch (error: Exception) {
                     Library.logPlayback("Widget playback failed: ${error.javaClass.simpleName}")
                 } finally {
-                    finish()
+                    finish.run()
                 }
                 }
             }.onFailure {
                 Library.logPlayback("Widget controller setup failed: ${it.javaClass.simpleName}")
-                finish()
+                finish.run()
             }
         } else if (intent.action == ACTION_REFRESH) {
             refreshFromPlayer(context)
