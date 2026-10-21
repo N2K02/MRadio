@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -52,6 +54,7 @@ fun RadioSettings(
     val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
     val experimentalEnabled by AppUpdater.experimentalEnabled.collectAsState()
+    val playbackEvents by Library.events.collectAsState()
     var page by rememberSaveable { mutableStateOf("Settings") }
     fun back() {
         if (page == "Settings") onDismiss() else page = "Settings"
@@ -121,7 +124,28 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { onEqualizer() },
                             )
+                        } else if (current == "Diagnostics") {
+                            ListItem(
+                                headlineContent = { Text("Playback events") },
+                                supportingContent = { Text("Session-only activity; no stream URLs or personal data") },
+                                trailingContent = {
+                                    TextButton(onClick = Library::clearPlaybackLog) { Text("Clear") }
+                                },
+                            )
+                            if (playbackEvents.isEmpty()) {
+                                ListItem(headlineContent = { Text("No events yet") })
+                            } else {
+                                playbackEvents.forEach { event ->
+                                    ListItem(headlineContent = { Text(event) })
+                                }
+                            }
                         } else {
+                            ListItem(
+                                headlineContent = { Text("Connection diagnostics") },
+                                supportingContent = { Text("Playback, buffering and stream errors") },
+                                leadingContent = { Icon(Icons.Rounded.BugReport, null) },
+                                modifier = Modifier.clickable { page = "Diagnostics" },
+                            )
                             ListItem(
                                 headlineContent = { Text("MRadio") },
                                 supportingContent = { Text(versionDescription) },
