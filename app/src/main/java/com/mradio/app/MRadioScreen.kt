@@ -1032,8 +1032,15 @@ private fun NowPlayingBar(
     onNext: () -> Unit,
 ) {
     val broken by Library.broken.collectAsState()
+    val barColor by animateColorAsState(
+        targetValue = if (player.failed) MaterialTheme.colorScheme.errorContainer
+            else if (player.isPlaying) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = tween(240),
+        label = "Mini-player background",
+    )
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = barColor,
         shape = RoundedCornerShape(32.dp),
         tonalElevation = 3.dp,
         onClick = onOpen,
@@ -1067,13 +1074,16 @@ private fun NowPlayingBar(
                             modifier = Modifier.size(16.dp).padding(end = 4.dp),
                         )
                     }
-                    Text(
-                        statusText(station, player, station.id in broken),
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = statusText(station, player, station.id in broken),
+                        label = "Playback status",
+                    ) { status -> Text(
+                        status,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (player.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                    )
+                    ) }
                 }
             }
             if (!isMine) {
