@@ -232,7 +232,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val updateState by AppUpdater.state.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
-    BackHandler(enabled = homeTab != "All stations" && !settingsMenu && !playerOpen && !equalizerOpen) {
+    BackHandler(enabled = homeTab != "All stations" && !settingsMenu && !playerOpen && !equalizerOpen && infoFor == null && !showHidden && !pickCountry && confirmHideStation == null) {
         homeTab = "All stations"
         query = ""
     }
