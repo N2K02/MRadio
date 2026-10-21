@@ -954,6 +954,11 @@ private fun CountryPicker(selected: String, onPick: (String) -> Unit, onDismiss:
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = {
+            TextButton(onClick = { onPick(Directory.MAURITIUS) }) {
+                Text("Reset to Mauritius")
+            }
+        },
     )
 }
 
