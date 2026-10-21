@@ -523,9 +523,22 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         }
                     }
                 }
-                item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
+                if (homeTab == "All stations") item(key = "update") { UpdateCard(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
 
-                if (query.isBlank()) {
+                if (homeTab == "Favorites" && query.isBlank()) {
+                    header("Favorites")
+                    if (myList.isEmpty()) message("Tap the heart on a station to add it to Favorites.")
+                    items(myList, key = { "favorites-" + it.id }) {
+                        StationItem(it, true, myList, Modifier.animateItem())
+                    }
+                } else if (homeTab == "Recent" && query.isBlank()) {
+                    header("Recently played")
+                    val recentVisible = recent.filterNot { Library.isHidden(it) }
+                    if (recentVisible.isEmpty()) message("Stations you play will appear here.")
+                    items(recentVisible, key = { "history-" + it.id }) {
+                        StationItem(it, false, recentVisible, Modifier.animateItem())
+                    }
+                } else if (query.isBlank()) {
                     header(
                         "Favourite Radios",
                         expanded = favouritesOpen,
@@ -536,13 +549,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     if (favouritesOpen) {
                         if (myList.isEmpty()) message("Tap the heart on any station below to add it here.")
                         items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
-                    }
-                    if (recent.isNotEmpty()) {
-                        header("Recently played")
-                        val recentVisible = recent.filterNot { Library.isHidden(it) }.take(8)
-                        items(recentVisible, key = { "recent-" + it.id }) {
-                            StationItem(it, false, recentVisible, Modifier.animateItem())
-                        }
                     }
 
                     header(
