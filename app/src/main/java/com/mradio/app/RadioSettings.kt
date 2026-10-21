@@ -250,7 +250,10 @@ fun RadioSettings(
                                 modifier = Modifier.clickable { onEqualizer() },
                             )
                         } else if (current == "Radio alarm") {
-                            val available = (Library.myStations() + stationList).distinctBy { it.id }
+                            // Only saved playable stations survive a cold start or device reboot.
+                            val available = (Library.myStations() + stationList)
+                                .filter { it.streams.isNotEmpty() }
+                                .distinctBy { it.id }
                             val chosen = available.firstOrNull { it.id == alarmStationId }
                                 ?: available.firstOrNull { it.id == RadioAlarm.scheduledStation(context) }
                                 ?: available.firstOrNull()
@@ -264,7 +267,7 @@ fun RadioSettings(
                                             expanded = alarmMenuOpen,
                                             onDismissRequest = { alarmMenuOpen = false },
                                         ) {
-                                            available.take(100).forEach { station ->
+                                            available.forEach { station ->
                                                 androidx.compose.material3.DropdownMenuItem(
                                                     text = { Text(station.name) },
                                                     onClick = {
@@ -281,10 +284,14 @@ fun RadioSettings(
                                 ListItem(
                                     headlineContent = { Text("Upcoming alarm") },
                                     supportingContent = {
-                                        Text(java.text.DateFormat.getDateTimeInstance(
+                                        val time = java.text.DateFormat.getDateTimeInstance(
                                             java.text.DateFormat.MEDIUM,
                                             java.text.DateFormat.SHORT,
-                                        ).format(java.util.Date(at)))
+                                        ).format(java.util.Date(at))
+                                        val stationName = available.firstOrNull {
+                                            it.id == RadioAlarm.scheduledStation(context)
+                                        }?.name ?: "Station unavailable"
+                                        Text("$time · $stationName")
                                     },
                                     trailingContent = {
                                         TextButton(onClick = { RadioAlarm.cancel(context) }) { Text("Cancel") }
