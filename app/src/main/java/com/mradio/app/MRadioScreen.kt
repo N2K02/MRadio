@@ -528,6 +528,80 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             }
 
                         }
+                    }
+                }
+                if (homeTab == "All stations") {
+                    item(key = "home-player") {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            onClick = { if (current != null) playerOpen = true },
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 52)
+                                    else Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null)
+                                    }
+                                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                        Text(if (player.isPlaying) "● LIVE RADIO" else "NOW PLAYING",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.labelSmall)
+                                        Text(current?.name ?: "Choose a station",
+                                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            if (current == null) "Select a radio below" else statusText(current, player, currentBroken),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (current != null) IconButton(onClick = {
+                                        if (Library.inMine(current)) removeFromMine(current) else addToMine(current)
+                                    }) {
+                                        Icon(
+                                            if (Library.inMine(current)) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                            contentDescription = "Toggle favorite",
+                                        )
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
+                                        enabled = current != null) {
+                                        Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous station")
+                                    }
+                                    FilledIconButton(
+                                        onClick = {
+                                            if (current != null) {
+                                                if (player.failed) retry(current) else playOrPause(current, emptyList())
+                                            } else myList.firstOrNull()?.let { playOrPause(it, myList) }
+                                        },
+                                        modifier = Modifier.size(48.dp),
+                                        enabled = controller != null,
+                                    ) {
+                                        Icon(
+                                            if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                            contentDescription = if (player.playWhenReady) "Pause radio" else "Play radio",
+                                        )
+                                    }
+                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
+                                        enabled = current != null) {
+                                        Icon(Icons.Rounded.SkipNext, contentDescription = "Next station")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item(key = "station-controls") {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         if (showSearch) {
                             TextField(
                                 value = query,
@@ -599,75 +673,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                             stationSort = "Default"
                                             workingOnly = false
                                         }) { Text("Reset") }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (homeTab == "All stations" && query.isBlank()) {
-                    item(key = "home-player") {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            onClick = { if (current != null) playerOpen = true },
-                        ) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 52)
-                                    else Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null)
-                                    }
-                                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                                        Text(if (player.isPlaying) "● LIVE RADIO" else "NOW PLAYING",
-                                            color = MaterialTheme.colorScheme.primary,
-                                            style = MaterialTheme.typography.labelSmall)
-                                        Text(current?.name ?: "Choose a station",
-                                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(
-                                            if (current == null) "Select a radio below" else statusText(current, player, currentBroken),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    if (current != null) IconButton(onClick = {
-                                        if (Library.inMine(current)) removeFromMine(current) else addToMine(current)
-                                    }) {
-                                        Icon(
-                                            if (Library.inMine(current)) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                                            contentDescription = "Toggle favorite",
-                                        )
-                                    }
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
-                                        enabled = current != null) {
-                                        Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous station")
-                                    }
-                                    FilledIconButton(
-                                        onClick = {
-                                            if (current != null) {
-                                                if (player.failed) retry(current) else playOrPause(current, emptyList())
-                                            } else myList.firstOrNull()?.let { playOrPause(it, myList) }
-                                        },
-                                        modifier = Modifier.size(48.dp),
-                                        enabled = controller != null,
-                                    ) {
-                                        Icon(
-                                            if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                            contentDescription = if (player.playWhenReady) "Pause radio" else "Play radio",
-                                        )
-                                    }
-                                    IconButton(onClick = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
-                                        enabled = current != null) {
-                                        Icon(Icons.Rounded.SkipNext, contentDescription = "Next station")
                                     }
                                 }
                             }
