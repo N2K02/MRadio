@@ -509,23 +509,48 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 contentPadding = padding,
             ) {
                 item(key = "home-head") {
-                    Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 6.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = 20.dp, top = 4.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
                         ) {
-                            // Use the same branding as the installed launcher icon.
                             AndroidView(
                                 factory = { ctx ->
                                     android.widget.ImageView(ctx).apply {
                                         setImageDrawable(ctx.packageManager.getApplicationIcon(ctx.packageName))
                                         scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                                        contentDescription = "mRadio"
+                                        contentDescription = null
                                     }
                                 },
-                                modifier = Modifier.size(52.dp),
+                                modifier = Modifier.size(30.dp),
                             )
-                            Spacer(Modifier.weight(1f))
+                            Spacer(Modifier.width(7.dp))
+                            Text(
+                                "mRadio",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                if (homeTab == "Search") Icons.Rounded.Search else Icons.Rounded.Home,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Text(
+                                if (homeTab == "Search") "Search" else "Home",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
                     }
                 }
