@@ -471,7 +471,7 @@ class PlaybackService : MediaLibraryService() {
         if (wasPlaying) {
             wasPlaying = false
             val url = queue.getOrNull(attempt) ?: return
-            scheduleRetry(station, 2000) { play(station, url) }
+            scheduleRetry(station, nextBackoff()) { play(station, url) }
             return
         }
 
@@ -520,18 +520,17 @@ class PlaybackService : MediaLibraryService() {
     /** Waits for the connection to return; a timer retries anyway in case the network never reports as validated. */
     private fun waitForNetwork(station: Station) {
         waitingForNetwork = true
-        scheduleRetry(station, nextBackoff()) {
-            waitingForNetwork = false
-            restartCycle(station)
-        }
+        // Do not wake the radio periodically while disconnected. The validated-network
+        // callback (or a manual Play action) starts a fresh attempt when connectivity returns.
+        retryJob?.cancel()
     }
 
     /** Called when a validated internet connection appears. */
     private fun onNetworkBack() {
         if (!waitingForNetwork) return
         val station = current ?: return
+        if (!hasNetwork() || !player.playWhenReady) return
         waitingForNetwork = false
-        retryRound = 0
         // Give the connection a moment to settle before reconnecting.
         scheduleRetry(station, 1500) { restartCycle(station) }
     }
@@ -559,9 +558,9 @@ class PlaybackService : MediaLibraryService() {
         retryRound = 0
     }
 
-    /** 3s, 5s, 10s, 20s, then every 30s. */
+    /** Back off repeated stream failures: 5s, 10s, 20s, 40s, 60s, then 120s. */
     private fun nextBackoff(): Long {
-        val steps = longArrayOf(3_000, 5_000, 10_000, 20_000, 30_000)
+        val steps = longArrayOf(5_000, 10_000, 20_000, 40_000, 60_000, 120_000)
         return steps[minOf(retryRound++, steps.size - 1)]
     }
 
