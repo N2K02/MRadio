@@ -431,7 +431,7 @@ object Library {
         _recent.value = _recent.value.filterNot { it.id == id }
         prefs.edit().putString("recent", JSONArray().apply {
             _recent.value.forEach { put(it.toJson()) }
-        }.toString()).remove("good:$id").remove("worked:$id").apply()
+        }.toString()).remove("good:$id").remove("worked:$id").remove("preferred:$id").apply()
         seen.remove(id)
         saveStations()
     }
@@ -551,9 +551,25 @@ object Library {
      * The order to try streams in: the one that last played fine first (it may also be a
      * fallback found online), then the station's own list, best first.
      */
+    /** A manual choice takes precedence, but fallback still tries every other known URL. */
+    fun preferredStream(stationId: String): String? =
+        prefs.getString("preferred:$stationId", null)
+
+    fun setPreferredStream(station: Station, url: String?) {
+        val known = (station.streams + listOfNotNull(prefs.getString("good:${station.id}", null))).distinct()
+        require(url == null || url in known) { "Unknown stream for station" }
+        prefs.edit().apply {
+            if (url == null) remove("preferred:${station.id}")
+            else putString("preferred:${station.id}", url)
+        }.apply()
+    }
+
     fun orderedStreams(station: Station): List<String> {
+        val preferred = preferredStream(station.id)?.takeIf {
+            it in station.streams || it == prefs.getString("good:${station.id}", null)
+        }
         val good = prefs.getString("good:${station.id}", null)
-        return (listOfNotNull(good) + station.streams).distinct()
+        return (listOfNotNull(preferred, good) + station.streams).distinct()
     }
 
     fun markGood(stationId: String, url: String) {
