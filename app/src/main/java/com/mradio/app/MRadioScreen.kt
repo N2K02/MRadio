@@ -620,7 +620,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     item(key = "home-player") {
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(22.dp),
+                            shape = RoundedCornerShape(18.dp),
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             onClick = { if (current != null) playerOpen = true },
                         ) {
@@ -654,8 +654,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                     }
                                 }
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     IconButton(onClick = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
@@ -1101,7 +1101,7 @@ private fun LazyListScope.header(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (collapsible) Modifier.clickable(onClickLabel = if (expanded == true) "Collapse $text" else "Expand $text", onClick = onToggle) else Modifier)
-            .padding(start = 20.dp, end = 16.dp, top = 7.dp, bottom = 2.dp),
+            .padding(start = 20.dp, end = 16.dp, top = 10.dp, bottom = 4.dp),
     ) {
         Text(
             text,
@@ -1211,7 +1211,15 @@ private fun StationRow(
     )
     ListItem(
         headlineContent = {
-            Text(station.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text(station.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
+                    modifier = Modifier.weight(1f, fill = false))
+                if (isCurrent && isPlayRequested) {
+                    Text("LIVE", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary)
+                }
+            }
         },
         supportingContent = {
             val line = when {
@@ -1224,7 +1232,8 @@ private fun StationRow(
                 line,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (isBroken) MaterialTheme.colorScheme.error else Color.Unspecified,
+                color = if (isBroken) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
             )
         },
         leadingContent = { StationBadge(station, spinning = isPlaying, size = 46) },
@@ -1288,7 +1297,7 @@ private fun StationRow(
             containerColor = rowColor,
         ),
         modifier = modifier
-            .padding(horizontal = 16.dp, vertical = 2.dp)
+            .padding(horizontal = 16.dp, vertical = 3.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
     )
