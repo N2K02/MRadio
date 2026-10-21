@@ -60,7 +60,7 @@ private tailrec fun Context.activity(): Activity? = when (this) {
 
 /**
  * Shows when an update is available, downloading or ready to install; hidden otherwise.
- * Put it near the top of the main screen.
+ * Rendered only on the Settings > About & updates page for both release channels.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
