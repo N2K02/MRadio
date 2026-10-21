@@ -451,6 +451,13 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
+                // Keep the bar and gesture-navigation inset opaque, so station cards never
+                // show through the controls on edge-to-edge Android layouts.
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                 Column(Modifier.navigationBarsPadding()) {
                     if (homeTab != "All stations" && current != null) {
                         NowPlayingBar(
@@ -464,9 +471,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
                         )
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     NavigationBar(
                         modifier = Modifier.fillMaxWidth(),
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        containerColor = MaterialTheme.colorScheme.surface,
                         tonalElevation = 0.dp,
                     ) {
                         NavigationBarItem(
@@ -497,6 +505,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             alwaysShowLabel = true,
                         )
                     }
+                }
                 }
             },
         ) { padding ->
