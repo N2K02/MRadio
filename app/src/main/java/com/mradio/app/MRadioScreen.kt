@@ -514,7 +514,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 contentPadding = padding,
             ) {
                 item(key = "home-head") {
-                    Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 12.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 6.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -619,15 +619,15 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 if (homeTab == "All stations" && query.isBlank()) {
                     item(key = "home-player") {
                         Surface(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(22.dp),
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             onClick = { if (current != null) playerOpen = true },
                         ) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 58)
-                                    else Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+                                    if (current != null) StationBadge(current, spinning = player.isPlaying, size = 52)
+                                    else Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                                         Icon(Icons.Rounded.GraphicEq, contentDescription = null)
                                     }
                                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
@@ -668,7 +668,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                                 if (player.failed) retry(current) else playOrPause(current, emptyList())
                                             } else myList.firstOrNull()?.let { playOrPause(it, myList) }
                                         },
-                                        modifier = Modifier.size(52.dp),
+                                        modifier = Modifier.size(48.dp),
                                         enabled = controller != null,
                                     ) {
                                         Icon(
@@ -1101,14 +1101,14 @@ private fun LazyListScope.header(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (collapsible) Modifier.clickable(onClickLabel = if (expanded == true) "Collapse $text" else "Expand $text", onClick = onToggle) else Modifier)
-            .padding(start = 24.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            .padding(start = 20.dp, end = 16.dp, top = 7.dp, bottom = 2.dp),
     ) {
         Text(
             text,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+            modifier = Modifier.weight(1f).padding(vertical = 5.dp),
         )
         action?.invoke()
         if (collapsible) {
@@ -1227,7 +1227,7 @@ private fun StationRow(
                 color = if (isBroken) MaterialTheme.colorScheme.error else Color.Unspecified,
             )
         },
-        leadingContent = { StationBadge(station, spinning = isPlaying) },
+        leadingContent = { StationBadge(station, spinning = isPlaying, size = 46) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
@@ -1288,8 +1288,8 @@ private fun StationRow(
             containerColor = rowColor,
         ),
         modifier = modifier
-            .padding(horizontal = 16.dp, vertical = 3.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
     )
 }
@@ -1313,14 +1313,14 @@ private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
     }
     Box(
         Modifier.size(size.dp).clip(RoundedCornerShape((size / 4).dp))
-            .background(scheme.surfaceContainerHigh),
+            .background(Color.White),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             initials(station.name),
             style = if (size >= 100) MaterialTheme.typography.displayMedium
                 else MaterialTheme.typography.titleMedium,
-            color = scheme.primary,
+            color = Color(0xFF235A91),
             fontWeight = FontWeight.Bold,
         )
         logo?.let { url ->
@@ -1328,7 +1328,7 @@ private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
                 model = url,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding((size / 10).dp),
+                modifier = Modifier.fillMaxSize().padding((size / 14).dp),
             )
         }
     }
