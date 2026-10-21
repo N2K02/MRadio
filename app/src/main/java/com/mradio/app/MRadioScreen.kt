@@ -59,6 +59,7 @@ import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
@@ -190,6 +191,8 @@ private fun placeName(place: String) = if (place == Directory.WORLDWIDE) "Worldw
 fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val stations by Library.stations.collectAsState()
     val mine by Library.mine.collectAsState()
+    val pinned by Library.pinned.collectAsState()
+    val recent by Library.recent.collectAsState()
     val broken by Library.broken.collectAsState()
     val hidden by Library.hidden.collectAsState()
     val player = rememberPlayerUi(controller)
@@ -255,7 +258,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         searching = false
     }
 
-    val myList = remember(stations, mine, hidden) { Library.myStations() }
+    val myList = remember(stations, mine, pinned, hidden) { Library.myStations() }
     val moreList = remember(stations, mine, discovered, place, hidden) {
         Library.moreStations(discovered.orEmpty(), mauritius = place == Directory.MAURITIUS)
     }
@@ -347,6 +350,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             onClick = { focus.clearFocus(); playOrPause(station, list) },
             onHeart = { if (isMine) removeFromMine(station) else addToMine(station) },
             onRemove = { removeFromMine(station) },
+            isPinned = station.id in pinned,
+            onPin = if (inMineSection) ({ Library.togglePinned(station.id) }) else null,
             onInfo = { infoFor = station },
             onMoveUp = if (inMineSection && arranging) ({ Library.moveInMine(station.id, -1) }) else null,
             onMoveDown = if (inMineSection && arranging) ({ Library.moveInMine(station.id, +1) }) else null,
@@ -458,6 +463,13 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     if (favouritesOpen) {
                         if (myList.isEmpty()) message("Tap the heart on any station below to add it here.")
                         items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
+                    }
+                    if (recent.isNotEmpty()) {
+                        header("Recently played")
+                        val recentVisible = recent.filterNot { Library.isHidden(it) }.take(8)
+                        items(recentVisible, key = { "recent-" + it.id }) {
+                            StationItem(it, false, recentVisible, Modifier.animateItem())
+                        }
                     }
 
                     header(
@@ -853,6 +865,8 @@ private fun StationRow(
     onHeart: () -> Unit,
     onRemove: () -> Unit,
     onInfo: () -> Unit,
+    isPinned: Boolean = false,
+    onPin: (() -> Unit)? = null,
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -898,6 +912,15 @@ private fun StationRow(
                         Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move ${station.name} down")
                     }
                 } else if (inMineSection) {
+                    if (onPin != null) {
+                        IconButton(onClick = onPin) {
+                            Icon(
+                                Icons.Rounded.PushPin,
+                                contentDescription = if (isPinned) "Unpin ${station.name}" else "Pin ${station.name}",
+                                tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     IconButton(onClick = onRemove) {
                         Icon(
                             Icons.Rounded.RemoveCircleOutline,
