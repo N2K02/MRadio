@@ -51,6 +51,7 @@ fun RadioSettings(
 ) {
     val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
+    val experimentalEnabled by AppUpdater.experimentalEnabled.collectAsState()
     var page by rememberSaveable { mutableStateOf("Settings") }
     fun back() {
         if (page == "Settings") onDismiss() else page = "Settings"
@@ -127,8 +128,22 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.Settings, null) },
                             )
                             ListItem(
+                                headlineContent = { Text("Experimental updates") },
+                                supportingContent = { Text("Offer signed APKs from successful pull request builds. Test builds may have bugs.") },
+                                trailingContent = {
+                                    Switch(
+                                        checked = experimentalEnabled,
+                                        onCheckedChange = AppUpdater::setExperimentalEnabled,
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    AppUpdater.setExperimentalEnabled(!experimentalEnabled)
+                                },
+                            )
+                            HorizontalDivider()
+                            ListItem(
                                 headlineContent = { Text("Check for updates") },
-                                supportingContent = { Text("Check GitHub Releases for a newer version") },
+                                supportingContent = { Text(if (experimentalEnabled) "Check latest green PR build and official releases" else "Check official GitHub releases") },
                                 leadingContent = { Icon(Icons.Rounded.SystemUpdate, null) },
                                 modifier = Modifier.clickable { onCheckUpdates() },
                             )
