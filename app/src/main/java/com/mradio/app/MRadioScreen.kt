@@ -1,6 +1,9 @@
 package com.mradio.app
 
 import android.os.Bundle
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -57,6 +60,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PowerSettingsNew
@@ -129,6 +133,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
@@ -200,6 +205,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
+    val context = LocalContext.current
 
     var query by rememberSaveable { mutableStateOf("") }
     var homeTab by rememberSaveable { mutableStateOf("All stations") }
@@ -356,6 +362,14 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             isPinned = station.id in pinned,
             onPin = if (inMineSection) ({ Library.togglePinned(station.id) }) else null,
             onInfo = { infoFor = station },
+            onCopy = {
+                val url = Library.orderedStreams(station).firstOrNull()
+                if (url != null) {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("Station stream URL", url))
+                    announce("Stream URL copied", null)
+                } else announce("No stream URL is available yet", null)
+            },
             onMoveUp = if (inMineSection && arranging) ({ Library.moveInMine(station.id, -1) }) else null,
             onMoveDown = if (inMineSection && arranging) ({ Library.moveInMine(station.id, +1) }) else null,
             modifier = modifier,
@@ -958,6 +972,7 @@ private fun StationRow(
     onHeart: () -> Unit,
     onRemove: () -> Unit,
     onInfo: () -> Unit,
+    onCopy: () -> Unit,
     isPinned: Boolean = false,
     onPin: (() -> Unit)? = null,
     onMoveUp: (() -> Unit)? = null,
@@ -992,42 +1007,47 @@ private fun StationRow(
         leadingContent = { StationBadge(station, spinning = isPlaying) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isBroken) {
-                    IconButton(onClick = onInfo) {
-                        Icon(Icons.Rounded.Info, contentDescription = "Why isn't it working?", tint = MaterialTheme.colorScheme.error)
-                    }
+                IconButton(onClick = onClick) {
+                    Icon(
+                        if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause ${station.name}" else "Play ${station.name}",
+                    )
                 }
-                if (onMoveUp != null && onMoveDown != null) {
-                    IconButton(onClick = onMoveUp) {
-                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Move ${station.name} up")
+                var menuOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "More options for ${station.name}")
                     }
-                    IconButton(onClick = onMoveDown) {
-                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Move ${station.name} down")
-                    }
-                } else if (inMineSection) {
-                    if (onPin != null) {
-                        IconButton(onClick = onPin) {
-                            Icon(
-                                Icons.Rounded.PushPin,
-                                contentDescription = if (isPinned) "Unpin ${station.name}" else "Pin ${station.name}",
-                                tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (isMine) "Remove from Favorites" else "Add to Favorites") },
+                            onClick = { menuOpen = false; onHeart() },
+                            leadingIcon = {
+                                Icon(if (isMine) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, null)
+                            },
+                        )
+                        if (inMineSection && onPin != null) {
+                            DropdownMenuItem(
+                                text = { Text(if (isPinned) "Unpin" else "Pin to top") },
+                                onClick = { menuOpen = false; onPin() },
+                                leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
                             )
                         }
-                    }
-                    IconButton(onClick = onRemove) {
-                        Icon(
-                            Icons.Rounded.RemoveCircleOutline,
-                            contentDescription = "Remove from Favourite Radios",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        DropdownMenuItem(
+                            text = { Text("Copy stream URL") },
+                            onClick = { menuOpen = false; onCopy() },
                         )
-                    }
-                } else {
-                    IconButton(onClick = onHeart) {
-                        Icon(
-                            if (isMine) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            contentDescription = if (isMine) "Remove from Favourite Radios" else "Add to Favourite Radios",
-                            tint = if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        DropdownMenuItem(
+                            text = { Text("Station details") },
+                            onClick = { menuOpen = false; onInfo() },
+                            leadingIcon = { Icon(Icons.Rounded.Info, null) },
                         )
+                        if (inMineSection && onMoveUp != null && onMoveDown != null) {
+                            DropdownMenuItem(text = { Text("Move up") },
+                                onClick = { menuOpen = false; onMoveUp() })
+                            DropdownMenuItem(text = { Text("Move down") },
+                                onClick = { menuOpen = false; onMoveDown() })
+                        }
                     }
                 }
             }
