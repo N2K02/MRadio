@@ -36,6 +36,23 @@ object RadioAlarm {
             .getLong("at", 0L).takeIf { it > System.currentTimeMillis() }
     }
 
+    /** Re-register a pending alarm after reboot or when exact-alarm access is granted. */
+    fun restoreScheduled(context: Context) {
+        val store = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val whenMillis = store.getLong("at", 0L)
+        val station = store.getString("station", null)
+        if (whenMillis <= System.currentTimeMillis() || station.isNullOrBlank()) {
+            store.edit().clear().apply()
+            _alarmAt.value = null
+            return
+        }
+        _alarmAt.value = whenMillis
+        if (canSchedule(context) && Library.find(station) != null) {
+            runCatching { schedule(context, whenMillis, station) }
+                .onFailure { Library.logPlayback("Radio alarm reschedule failed: ${it.javaClass.simpleName}") }
+        }
+    }
+
     fun scheduledStation(context: Context): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("station", null)
 
@@ -101,5 +118,16 @@ class RadioAlarmReceiver : BroadcastReceiver() {
         }.onFailure {
             Library.logPlayback("Alarm couldn't start playback: ${it.javaClass.simpleName}")
         }
+    }
+}
+
+/** Restores the single scheduled alarm after boot or newly granted alarm access. */
+class RadioAlarmBootReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
+            intent.action != AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
+        ) return
+        Library.init(context)
+        RadioAlarm.restoreScheduled(context)
     }
 }
