@@ -651,16 +651,24 @@ class PlaybackService : MediaLibraryService() {
             // Do not auto-start for ordinary phone media browsers or repeated root requests.
             if (browser.packageName == "com.google.android.projection.gearhead" &&
                 Library.autoPlayAuto.value && !autoStartedForCar &&
-                player.playbackState == Player.STATE_IDLE && player.mediaItemCount == 0
+                player.playbackState == Player.STATE_IDLE && player.mediaItemCount == 0 &&
+                current == null && !player.playWhenReady
             ) {
                 val station = Library.lastPlayed?.let(Library::find)
                     ?: Library.myStations().firstOrNull()
                 if (station != null) {
                     autoStartedForCar = true
                     scope.launch {
-                        player.setMediaItem(startStation(station))
-                        player.prepare()
-                        player.play()
+                        // The phone may have started playback after the browser request.
+                        // Never replace a station that was selected in the meantime.
+                        if (player.mediaItemCount == 0 && current == null &&
+                            player.playbackState == Player.STATE_IDLE && !player.playWhenReady &&
+                            Library.autoPlayAuto.value
+                        ) {
+                            player.setMediaItem(startStation(station))
+                            player.prepare()
+                            player.play()
+                        }
                     }
                 }
             }
