@@ -53,6 +53,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
@@ -210,6 +211,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var homeTab by rememberSaveable { mutableStateOf("All stations") }
     var showSearch by rememberSaveable { mutableStateOf(false) }
+    var filtersOpen by rememberSaveable { mutableStateOf(false) }
+    var selectedGenre by rememberSaveable { mutableStateOf("All genres") }
+    var stationSort by rememberSaveable { mutableStateOf("Default") }
+    var workingOnly by rememberSaveable { mutableStateOf(false) }
     var place by rememberSaveable { mutableStateOf(Library.place) }
     var pickCountry by remember { mutableStateOf(false) }
     var playerOpen by rememberSaveable { mutableStateOf(false) }
@@ -267,14 +272,31 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         searching = false
     }
 
+    val availableGenres = remember(stations, discovered, online) {
+        (stations + discovered.orEmpty() + online.orEmpty())
+            .flatMap { it.tags.split(',') }
+            .map { it.trim().lowercase(Locale.ROOT) }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }.eachCount()
+            .entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .take(18).map { it.key }
+    }
+    fun filtered(items: List<Station>): List<Station> {
+        val eligible = items.filter {
+            (selectedGenre == "All genres" ||
+                it.tags.split(',').any { tag -> tag.trim().equals(selectedGenre, ignoreCase = true) }) &&
+                (!workingOnly || it.id !in broken)
+        }
+        return if (stationSort == "Name") eligible.sortedBy { it.name.lowercase(Locale.ROOT) } else eligible
+    }
     val myList = remember(stations, mine, pinned, hidden) { Library.myStations() }
     val moreList = remember(stations, mine, discovered, place, hidden) {
         Library.moreStations(discovered.orEmpty(), mauritius = place == Directory.MAURITIUS)
     }
-    val localResults = remember(query, stations, mine, hidden) { Library.searchLocal(query) }
-    val onlineResults = remember(online, stations, hidden) {
-        online?.filterNot { Library.known(it) || Library.isHidden(it) }
-    }
+    val visibleMine = filtered(myList)
+    val visibleMore = filtered(moreList)
+    val localResults = filtered(Library.searchLocal(query))
+    val onlineResults = online?.let { filtered(it.filterNot { station -> Library.known(station) || Library.isHidden(station) }) }
 
     val current = player.mediaId?.let { id -> Library.find(id) }
     val currentBroken = current != null && current.id in broken
@@ -480,6 +502,57 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             onPlace = ::choosePlace,
                             onPickCountry = { pickCountry = true },
                         )
+                        if (homeTab == "All stations") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(onClick = { filtersOpen = !filtersOpen }) {
+                                    Icon(Icons.Rounded.FilterList, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (filtersOpen) "Hide filters" else "Filter stations")
+                                }
+                            }
+                            AnimatedVisibility(filtersOpen) {
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                    Text("Genre", style = MaterialTheme.typography.labelMedium)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        (listOf("All genres") + availableGenres).forEach { genre ->
+                                            FilterChip(
+                                                selected = selectedGenre == genre,
+                                                onClick = { selectedGenre = genre; moreShown = PAGE; onlineShown = PAGE },
+                                                label = { Text(genre.replaceFirstChar { it.titlecase(Locale.ROOT) }) },
+                                            )
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        FilterChip(
+                                            selected = stationSort == "Name",
+                                            onClick = { stationSort = if (stationSort == "Name") "Default" else "Name" },
+                                            label = { Text("Sort A–Z") },
+                                        )
+                                        FilterChip(
+                                            selected = workingOnly,
+                                            onClick = { workingOnly = !workingOnly },
+                                            label = { Text("Hide unavailable") },
+                                        )
+                                        TextButton(onClick = {
+                                            selectedGenre = "All genres"
+                                            stationSort = "Default"
+                                            workingOnly = false
+                                        }) { Text("Reset") }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 if (homeTab == "All stations" && query.isBlank()) {
@@ -555,9 +628,9 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
                 if (homeTab == "Favorites" && query.isBlank()) {
                     header("Favorites")
-                    if (myList.isEmpty()) message("Tap the heart on a station to add it to Favorites.")
-                    items(myList, key = { "favorites-" + it.id }) {
-                        StationItem(it, true, myList, Modifier.animateItem())
+                    if (visibleMine.isEmpty()) message("No favorites match your filters.")
+                    items(visibleMine, key = { "favorites-" + it.id }) {
+                        StationItem(it, true, visibleMine, Modifier.animateItem())
                     }
                 } else if (homeTab == "Recent" && query.isBlank()) {
                     header("Recently played")
@@ -575,8 +648,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         } else null,
                     ) { favouritesOpen = !favouritesOpen }
                     if (favouritesOpen) {
-                        if (myList.isEmpty()) message("Tap the heart on any station below to add it here.")
-                        items(myList, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
+                        if (visibleMine.isEmpty()) message("No favorites match your filters.")
+                        items(visibleMine, key = { "mine-" + it.id }) { StationItem(it, true, myList, Modifier.animateItem()) }
                     }
 
                     header(
@@ -584,10 +657,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         expanded = moreOpen,
                     ) { moreOpen = !moreOpen }
                     if (moreOpen) {
-                        items(moreList.take(moreShown), key = { "more-" + it.id }) { StationItem(it, false, moreList, Modifier.animateItem()) }
-                        showMore(shown = moreShown, total = moreList.size) { moreShown += PAGE }
+                        items(visibleMore.take(moreShown), key = { "more-" + it.id }) { StationItem(it, false, visibleMore, Modifier.animateItem()) }
+                        showMore(shown = moreShown, total = visibleMore.size) { moreShown += PAGE }
                         when {
-                            discovered != null -> if (moreList.isEmpty()) message("No other stations found here.")
+                            discovered != null -> if (visibleMore.isEmpty()) message("No matching stations for these filters.")
                             discoverFailed -> item {
                                 RetryMessage("Couldn't reach the station directories for more stations.") { discoverKey++ }
                             }
