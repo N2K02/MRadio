@@ -370,6 +370,72 @@ object Library {
         return (local + fromDirectory.filterNot { known(it) }).filterNot { isHidden(it) }
     }
 
+    /** User-maintained streams; built-in stations cannot be overwritten or deleted. */
+    fun customStations(): List<Station> = _stations.value.filterNot { it.builtIn }
+
+    @Synchronized
+    fun saveCustomStation(
+        id: String?,
+        name: String,
+        streamUrl: String,
+        tags: String,
+        country: String,
+    ): Station {
+        check(initialized) { "Library is not initialized" }
+        val cleanName = name.trim()
+        val cleanUrl = streamUrl.trim()
+        val cleanTags = tags.trim()
+        val cleanCountry = country.trim().uppercase(java.util.Locale.ROOT)
+        require(cleanName.length in 1..100) { "Enter a station name (up to 100 characters)" }
+        require(cleanUrl.length in 10..2048 &&
+            (cleanUrl.startsWith("https://", true) || cleanUrl.startsWith("http://", true))
+        ) { "Enter a valid HTTP or HTTPS stream URL" }
+        val uri = android.net.Uri.parse(cleanUrl)
+        require(!uri.host.isNullOrBlank() && uri.userInfo == null) { "Invalid stream host" }
+        require(cleanTags.length <= 180) { "Genres must be 180 characters or fewer" }
+        require(cleanCountry.length == 2 && cleanCountry.all(Char::isLetter)) {
+            "Country must be a two-letter code"
+        }
+        val previous = id?.let { currentId ->
+            _stations.value.firstOrNull { it.id == currentId && !it.builtIn }
+                ?: error("Saved custom station no longer exists")
+        }
+        if (previous == null) require(customStations().size < 500) { "Custom station limit reached" }
+        val station = Station(
+            id = previous?.id ?: "custom:${java.util.UUID.randomUUID()}",
+            name = cleanName,
+            streams = listOf(cleanUrl),
+            tags = cleanTags,
+            favicon = previous?.favicon,
+            country = cleanCountry,
+            builtIn = false,
+        )
+        _stations.value = if (previous != null) _stations.value.map {
+            if (it.id == previous.id) station else it
+        } else _stations.value + station
+        saveStations()
+        if (previous == null) {
+            _mine.value = _mine.value + station.id
+            saveMine()
+        }
+        return station
+    }
+
+    @Synchronized
+    fun deleteCustomStation(id: String) {
+        require(_stations.value.any { it.id == id && !it.builtIn }) {
+            "Only user-added stations can be deleted"
+        }
+        removeFromMine(id)
+        _stations.value = _stations.value.filterNot { it.id == id }
+        _recent.value = _recent.value.filterNot { it.id == id }
+        prefs.edit().putString("recent", JSONArray().apply {
+            _recent.value.forEach { put(it.toJson()) }
+        }.toString()).remove("good:$id").remove("worked:$id").apply()
+        seen.remove(id)
+        saveStations()
+    }
+
     /** Adds the station to Favourite Radios (at the end). Returns the id it is kept under. */
     fun addToMine(station: Station): String {
         val keep = knownVersion(station) ?: station.copy(builtIn = false).also {
