@@ -769,7 +769,7 @@ class PlaybackService : MediaLibraryService() {
                     LibraryResult.ofItemList(visible.map { browseItem(it, artwork = true) }, params)
                 }
                 else -> Futures.immediateFuture(
-                    LibraryResult.ofError<ImmutableList<MediaItem>>(LibraryResult.RESULT_ERROR_BAD_VALUE),
+                    LibraryResult.ofError<ImmutableList<MediaItem>>(SessionError.ERROR_BAD_VALUE),
                 )
             }
         }
@@ -786,7 +786,7 @@ class PlaybackService : MediaLibraryService() {
             return future {
                 val station = resolve(mediaId)
                 if (station == null) {
-                    LibraryResult.ofError<MediaItem>(LibraryResult.RESULT_ERROR_BAD_VALUE)
+                    LibraryResult.ofError<MediaItem>(SessionError.ERROR_BAD_VALUE)
                 } else {
                     LibraryResult.ofItem(browseItem(station, artwork = true), null)
                 }
