@@ -217,10 +217,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     val context = LocalContext.current
 
     var query by rememberSaveable { mutableStateOf("") }
-    var homeTab by rememberSaveable { mutableStateOf("All stations") }
-    LaunchedEffect(homeTab) {
-        if (homeTab == "Favorites") homeTab = "All stations" // Migrate older saved tab state.
-    }
+    var homeTab by rememberSaveable { mutableStateOf(RadioDestination.HOME) }
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var selectedGenre by rememberSaveable { mutableStateOf("All genres") }
     var stationSort by rememberSaveable { mutableStateOf("Default") }
@@ -237,11 +234,11 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
     BackHandler(enabled = settingsMenu) {
         settingsMenu = false
-        homeTab = "All stations"
+        homeTab = RadioDestination.HOME
     }
 
-    BackHandler(enabled = homeTab != "All stations" && !settingsMenu && !playerOpen && !equalizerOpen && infoFor == null && !showHidden && !pickCountry && confirmHideStation == null) {
-        homeTab = "All stations"
+    BackHandler(enabled = homeTab != RadioDestination.HOME && !settingsMenu && !playerOpen && !equalizerOpen && infoFor == null && !showHidden && !pickCountry && confirmHideStation == null) {
+        homeTab = RadioDestination.HOME
         query = ""
     }
 
@@ -474,7 +471,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             Icon(
                                 when {
                                     settingsMenu -> Icons.Rounded.Settings
-                                    homeTab == "Search" -> Icons.Rounded.Search
+                                    homeTab == RadioDestination.SEARCH -> Icons.Rounded.Search
                                     else -> Icons.Rounded.Home
                                 },
                                 contentDescription = null,
@@ -484,7 +481,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             Text(
                                 when {
                                     settingsMenu -> "Settings"
-                                    homeTab == "Search" -> "Search"
+                                    homeTab == RadioDestination.SEARCH -> "Search"
                                     else -> "Home"
                                 },
                                 style = MaterialTheme.typography.titleLarge,
@@ -523,7 +520,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                 Column(Modifier.navigationBarsPadding()) {
-                    if ((homeTab == "Search" || settingsMenu) && current != null) {
+                    if ((homeTab == RadioDestination.SEARCH || settingsMenu) && current != null) {
                         NowPlayingBar(
                             station = current,
                             player = player,
@@ -542,15 +539,15 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         tonalElevation = 0.dp,
                     ) {
                         NavigationBarItem(
-                            selected = homeTab == "All stations" && !settingsMenu,
-                            onClick = { homeTab = "All stations"; query = ""; settingsMenu = false },
+                            selected = homeTab == RadioDestination.HOME && !settingsMenu,
+                            onClick = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false },
                             icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
                             label = { Text("Home") },
                             alwaysShowLabel = true,
                         )
                         NavigationBarItem(
-                            selected = homeTab == "Search" && !settingsMenu,
-                            onClick = { homeTab = "Search"; settingsMenu = false },
+                            selected = homeTab == RadioDestination.SEARCH && !settingsMenu,
+                            onClick = { homeTab = RadioDestination.SEARCH; settingsMenu = false },
                             icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                             label = { Text("Search") },
                             alwaysShowLabel = true,
@@ -602,7 +599,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
             ) {
-                if (homeTab == "All stations") {
+                if (homeTab == RadioDestination.HOME) {
                     item(key = "home-player") {
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -679,7 +676,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     }
                 }
 
-                if (homeTab == "Search") item(key = "station-controls") {
+                if (homeTab == RadioDestination.SEARCH) item(key = "station-controls") {
                     Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                         Text(
                             "Find stations",
@@ -761,7 +758,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     }
                 }
 
-                if (homeTab == "All stations") {
+                if (homeTab == RadioDestination.HOME) {
                     header(
                         "Favourite Radios",
                         action = if (myList.size > 1) {
