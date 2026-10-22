@@ -151,7 +151,11 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Configure MRADIO_DISTRIBUTION_TOKEN to publish signed APKs and update manifests to N2K02/n2k02.github.io before making this source repository private."
+            echo "::warning::MRADIO_DISTRIBUTION_TOKEN is missing; signed APK can be built but public updates cannot be published."
+            if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+              echo "::error::Stable distribution is required. Configure MRADIO_DISTRIBUTION_TOKEN with Contents read/write permission on N2K02/n2k02.github.io."
+              exit 1
+            fi
           fi
 
       - name: Publish stable or experimental APK to public distribution
@@ -168,15 +172,3 @@ jobs:
           path: ${{ env.APK_NAME }}.apk
           if-no-files-found: error
 
-      - name: Publish APK as a release (easy phone download)
-        # Compatibility while public distribution has not been configured. This fallback
-        # must not be relied upon after changing the source repository to private.
-        if: github.event_name != 'pull_request' && steps.distribution.outputs.enabled != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.VERSION }}
-          target_commitish: ${{ github.sha }}
-          name: ${{ env.APP }} ${{ env.VERSION }}
-          body_path: release-notes.md
-          files: ${{ env.APK_NAME }}.apk
-          make_latest: true
