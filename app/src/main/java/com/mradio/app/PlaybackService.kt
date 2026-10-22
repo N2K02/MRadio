@@ -94,10 +94,7 @@ class PlaybackService : MediaLibraryService() {
     private var waitingForNetwork = false
     private var retryRound = 0
     private var retryJob: Job? = null
-    // Listening accounting runs only during actual audio output, not while paused or idle.
-    private var listeningStartMs = 0L
-    private var listeningTransport = "unknown"
-    private var listeningBitrateKbps: Int? = null
+    private val listening = ListeningSessionTracker(SystemClock::elapsedRealtime, Library::recordListening)
     private var listeningJob: Job? = null
 
     private fun networkTransport(): String {
@@ -110,52 +107,29 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    private fun flushListening() {
-        if (listeningStartMs == 0L) return
-        val now = SystemClock.elapsedRealtime()
-        val duration = (now - listeningStartMs).coerceAtLeast(0L)
-        listeningStartMs = now
-        // Respect the 60-second maximum accepted by Library.recordListening.
-        var remaining = duration
-        while (remaining > 0L) {
-            val step = minOf(remaining, 60_000L)
-            Library.recordListening(step, listeningBitrateKbps, listeningTransport)
-            remaining -= step
-        }
-    }
-
     private fun updateListening(active: Boolean) {
         if (!active) {
-            flushListening()
-            listeningStartMs = 0L
+            listening.stop()
             listeningJob?.cancel()
             listeningJob = null
             return
         }
-        if (listeningStartMs != 0L) return
-        listeningStartMs = SystemClock.elapsedRealtime()
-        listeningTransport = networkTransport()
-        listeningBitrateKbps = Library.audio.value?.bitrateKbps
+        if (listening.isActive) return
+        listening.start(networkTransport(), Library.audio.value?.bitrateKbps)
         listeningJob = scope.launch {
             while (true) {
                 delay(60_000L)
-                flushListening()
-                listeningTransport = networkTransport()
-                listeningBitrateKbps = Library.audio.value?.bitrateKbps
+                listening.update(networkTransport(), Library.audio.value?.bitrateKbps)
+                listening.checkpoint()
             }
         }
     }
-
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         // Runs on a system thread; hop to the main thread before touching the player.
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
             scope.launch {
-                if (listeningStartMs != 0L) {
-                    flushListening()
-                    listeningTransport = networkTransport()
-                    listeningBitrateKbps = Library.audio.value?.bitrateKbps
-                }
+                listening.update(networkTransport(), Library.audio.value?.bitrateKbps)
             }
             if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
@@ -301,11 +275,7 @@ class PlaybackService : MediaLibraryService() {
             stationName = icy?.name,
             genre = icy?.genre,
         )
-        val newBitrate = Library.audio.value?.bitrateKbps
-        if (listeningStartMs != 0L && newBitrate != listeningBitrateKbps) {
-            flushListening()
-            listeningBitrateKbps = newBitrate
-        }
+        listening.update(networkTransport(), Library.audio.value?.bitrateKbps)
     }
 
     /**
