@@ -4,7 +4,7 @@
 set -euo pipefail
 
 PUBLIC_REPO="N2K02/n2k02.github.io"
-: "${GH_TOKEN:?mRadio must be configured}"
+: "${GH_TOKEN:?MRADIO_DISTRIBUTION_TOKEN must be configured}"
 : "${APK_NAME:?Missing APK_NAME}"
 : "${VERSION:?Missing VERSION}"
 : "${VERSION_CODE:?Missing VERSION_CODE}"
