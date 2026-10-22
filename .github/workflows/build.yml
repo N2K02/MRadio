@@ -86,7 +86,16 @@ jobs:
       - name: Verify unit tests and Android lint
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon testDebugUnitTest lintDebug
+          ./gradlew --no-daemon testDebugUnitTest lintDebug || {
+            echo "::group::Android lint findings"
+            if [ -f app/build/reports/lint-results-debug.txt ]; then
+              cat app/build/reports/lint-results-debug.txt
+            else
+              echo "Lint text report not generated"
+            fi
+            echo "::endgroup::"
+            exit 1
+          }
 
       - name: Build APK
         env:
