@@ -73,7 +73,7 @@ internal fun StationRow(
     ListItem(
         headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(station.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                Text(station.name, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
                     modifier = Modifier.weight(1f, fill = false))
                 if (isCurrent) {
@@ -90,7 +90,7 @@ internal fun StationRow(
             }
             Text(
                 line,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = if (isBroken) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
@@ -99,7 +99,7 @@ internal fun StationRow(
         leadingContent = { StationBadge(station, spinning = isPlaying, size = 46) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+                IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
                     Icon(
                         if (isPlayRequested) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (isPlayRequested) "Pause ${station.name}" else "Play ${station.name}",
@@ -159,7 +159,10 @@ internal fun StationRow(
         modifier = modifier
             .padding(horizontal = 16.dp, vertical = 3.dp)
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
+            .clickable(
+                onClickLabel = if (isPlayRequested) "Pause ${station.name}" else "Play ${station.name}",
+                onClick = onClick,
+            ),
     )
 }
 
