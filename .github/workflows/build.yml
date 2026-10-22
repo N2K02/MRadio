@@ -83,6 +83,11 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
+      - name: Verify unit tests and Android lint
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest lintDebug
+
       - name: Build APK
         env:
           SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
