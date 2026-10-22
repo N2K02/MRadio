@@ -194,7 +194,7 @@ jobs:
       - name: Check public distribution configuration
         id: distribution
         env:
-          DIST_TOKEN: ${{ secrets.mRadio }}
+          DIST_TOKEN: ${{ secrets.MRADIO_DISTRIBUTION_TOKEN }}
         run: |
           if [ -n "$DIST_TOKEN" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
@@ -206,6 +206,6 @@ jobs:
       - name: Publish stable or experimental APK to public distribution
         if: steps.distribution.outputs.enabled == 'true'
         env:
-          GH_TOKEN: ${{ secrets.mRadio }}
+          GH_TOKEN: ${{ secrets.MRADIO_DISTRIBUTION_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bash .github/scripts/publish-distribution.sh
