@@ -42,16 +42,26 @@ jobs:
       - name: Work out version and release notes
         env:
           REQUESTED: ${{ github.event.inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Last release tag like v1.3 (one decimal place).
-          last=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]$' | sort -V | tail -1 || true)
+          # The public website repository carries the stable releases, even though
+          # this source repository is private. Read its tags to avoid repeating 1.0.
+          local_last=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]$' | sed 's/^v//' | sort -V | tail -1 || true)
+          public_last=$(gh api 'repos/N2K02/n2k02.github.io/releases?per_page=100' \
+            --jq '.[].tag_name' 2>/dev/null \
+            | sed -nE 's/^mradio-v([0-9]+\.[0-9])-build-[0-9]+$/\1/p' \
+            | sort -V | tail -1 || true)
+          last=$(printf '%s\n%s\n' "$local_last" "$public_last" | grep -E '^[0-9]+\.[0-9]$' | sort -V | tail -1 || true)
           if [ -n "$REQUESTED" ]; then
             echo "$REQUESTED" | grep -Eq '^[0-9]+\.[0-9]$' || { echo "::error::Version must look like 1.0"; exit 1; }
             ver="$REQUESTED"
           elif [ -z "$last" ]; then
             ver="1.0"
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # PR APKs stay on the latest stable base and get an experimental suffix.
+            ver="$last"
           else
-            t=${last#v}; n=$(( ${t%.*} * 10 + ${t#*.} + 1 ))   # add 0.1
+            n=$(( ${last%.*} * 10 + ${last#*.} + 1 ))
             ver="$(( n / 10 )).$(( n % 10 ))"
           fi
           echo "VERSION=$ver" >> "$GITHUB_ENV"
@@ -61,10 +71,15 @@ jobs:
           else
             echo "APK_NAME=$APP-$ver" >> "$GITHUB_ENV"
           fi
-          echo "Version: $ver (previous: ${last:-none})"
+          echo "Version: $ver (previous stable: ${last:-none})"
 
           # Release notes = commit titles since the previous release (or the last old-style build).
-          prev="$last"
+          prev=""
+          if [ -n "$last" ]; then
+            # The public distribution tag may not exist locally. For a changelog,
+            # use a local source tag only when it exists.
+            git rev-parse -q --verify "refs/tags/v$last" >/dev/null && prev="v$last" || true
+          fi
           [ -n "$prev" ] || prev=$(git tag -l 'build-*' | sort -V | tail -1 || true)
           if [ -n "$prev" ]; then range="$prev..HEAD"; else range="HEAD"; fi
           changes=$(git log --no-merges --pretty='- %s' $range | head -40)
@@ -147,6 +162,34 @@ jobs:
           name: ${{ env.APK_NAME }}
           path: ${{ env.APK_NAME }}.apk
           if-no-files-found: error
+
+      - name: Publish signed APK to private MRadio Releases
+        # Private releases are visible to repository collaborators only.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            tag="experimental-pr-$PR_NUMBER-run-$GITHUB_RUN_NUMBER"
+            title="mRadio experimental · PR #$PR_NUMBER · build #$GITHUB_RUN_NUMBER"
+            target="$PR_HEAD_SHA"
+            extra=(--prerelease --latest=false)
+          else
+            tag="v$VERSION"
+            title="mRadio $VERSION"
+            target="$GITHUB_SHA"
+            extra=(--latest)
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release tag $tag already exists. Use a new version or workflow run."
+            exit 1
+          fi
+          gh release create "$tag" "$APK_NAME.apk" \
+            --repo "$GITHUB_REPOSITORY" --target "$target" \
+            --title "$title" --notes-file release-notes.md "${extra[@]}"
+          echo "Private release created: $tag"
 
       - name: Check public distribution configuration
         id: distribution
