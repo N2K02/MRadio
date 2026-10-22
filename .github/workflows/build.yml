@@ -83,6 +83,20 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
+      - name: Verify unit tests and Android lint
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest lintDebug || {
+            echo "::group::Android lint findings"
+            if [ -f app/build/reports/lint-results-debug.txt ]; then
+              cat app/build/reports/lint-results-debug.txt
+            else
+              echo "Lint text report not generated"
+            fi
+            echo "::endgroup::"
+            exit 1
+          }
+
       - name: Build APK
         env:
           SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
@@ -126,6 +140,31 @@ jobs:
           rm -rf "$K"
           "$BT/apksigner" verify --print-certs "$APK_NAME.apk" | grep -E "Signer.*(DN|SHA-256 digest)"
 
+      # We can build/test without the distribution credential, but do not publish publicly
+      # until MRADIO_DISTRIBUTION_TOKEN is configured in this source repository.
+      - name: Check public distribution configuration
+        id: distribution
+        env:
+          DIST_TOKEN: ${{ secrets.MRADIO_DISTRIBUTION_TOKEN }}
+        run: |
+          if [ -n "$DIST_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::MRADIO_DISTRIBUTION_TOKEN is missing; signed APK can be built but public updates cannot be published."
+            if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+              echo "::error::Stable distribution is required. Configure MRADIO_DISTRIBUTION_TOKEN with Contents read/write permission on N2K02/n2k02.github.io."
+              exit 1
+            fi
+          fi
+
+      - name: Publish stable or experimental APK to public distribution
+        if: steps.distribution.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.MRADIO_DISTRIBUTION_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/publish-distribution.sh
+
       - name: Upload APK (workflow artifact)
         uses: actions/upload-artifact@v4
         with:
@@ -133,13 +172,3 @@ jobs:
           path: ${{ env.APK_NAME }}.apk
           if-no-files-found: error
 
-      - name: Publish APK as a release (easy phone download)
-        if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.VERSION }}
-          target_commitish: ${{ github.sha }}
-          name: ${{ env.APP }} ${{ env.VERSION }}
-          body_path: release-notes.md
-          files: ${{ env.APK_NAME }}.apk
-          make_latest: true

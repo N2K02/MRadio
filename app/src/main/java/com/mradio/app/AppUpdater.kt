@@ -132,7 +132,8 @@ object AppUpdater {
             _state.value = State.Checking
             val result = runCatching {
                 val experimental = if (_experimentalEnabled.value) runCatching { latestExperimental() }.getOrNull() else null
-                experimental?.takeIf { it.versionCode > installedVersionCode } ?: latestRelease()
+                val stable = latestRelease()
+                listOfNotNull(stable, experimental).maxByOrNull { it.versionCode }
             }
             prefs.edit().putLong("lastCheck", System.currentTimeMillis()).apply()
             val release = result.getOrNull()
@@ -163,7 +164,7 @@ object AppUpdater {
             val file = apkFile(release)
             try {
                 if (!(file.exists() && verify(file, release) == null)) {
-                    if (release.experimental) downloadExperimental(release, file) else download(release, file)
+                    if (release.experimental && release.archiveSha256 != null) downloadExperimental(release, file) else download(release, file)
                     verify(file, release)?.let { problem ->
                         file.delete()
                         _state.value = State.Failed(problem, release, diagnostic(IllegalStateException(problem), release))
@@ -217,9 +218,51 @@ object AppUpdater {
             .onFailure { error -> _state.value = State.Failed("Could not open Android installer. Check the details for more information.", release, diagnostic(error, release)) }
     }
 
-    // ---------------------------------------------------------------- GitHub
+    // ---------------------------------------------------------------- Public distribution and legacy migration
 
-    private suspend fun latestRelease(): Release? = withContext(Dispatchers.IO) {
+    // Public channel metadata. No GitHub credentials or source access are required.
+    private val updateManifestBase = "https://n2k02.github.io/mradio/updates"
+
+    private suspend fun publishedRelease(experimental: Boolean): Release? = withContext(Dispatchers.IO) {
+        val channel = if (experimental) "experimental" else "stable"
+        val connection = URL("$updateManifestBase/$channel.json").openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 15_000
+            connection.setRequestProperty("User-Agent", "$appName-updater (Android)")
+            connection.setRequestProperty("Cache-Control", "no-cache")
+            if (connection.responseCode == 404) return@withContext null
+            if (connection.responseCode != 200) throw httpError(connection, connection.responseCode)
+            val o = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            val versionCode = o.optLong("versionCode")
+            val apkUrl = o.optString("apkUrl")
+            val sha256 = o.optString("sha256").lowercase()
+            if (versionCode <= 0L || !apkUrl.startsWith("https://") ||
+                !Regex("[a-f0-9]{64}").matches(sha256)) {
+                throw IOException("Invalid $channel update manifest")
+            }
+            val notesArray = o.optJSONArray("notes")
+            Release(
+                tag = o.getString("tag"),
+                versionName = o.getString("versionName"),
+                versionCode = versionCode,
+                notes = notesArray?.let { a -> (0 until a.length()).map { i -> a.optString(i) }.take(12) }
+                    ?: emptyList(),
+                apkUrl = apkUrl,
+                apkName = o.getString("apkName"),
+                apkSize = o.optLong("apkSize"),
+                sha256 = sha256,
+                pageUrl = o.optString("pageUrl").ifBlank { "https://n2k02.github.io/mradio/download/" },
+                experimental = experimental,
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private suspend fun latestRelease(): Release? = publishedRelease(false) ?: legacyLatestRelease()
+
+    private suspend fun legacyLatestRelease(): Release? = withContext(Dispatchers.IO) {
         val c = URL("https://api.github.com/repos/$repo/releases/latest").openConnection() as HttpURLConnection
         try {
             c.connectTimeout = 10_000
@@ -258,7 +301,9 @@ object AppUpdater {
     }
 
     /** Only choose completed, successful PR runs; never use an unsigned or failed artifact. */
-    private suspend fun latestExperimental(): Release? = withContext(Dispatchers.IO) {
+    private suspend fun latestExperimental(): Release? = publishedRelease(true) ?: legacyLatestExperimental()
+
+    private suspend fun legacyLatestExperimental(): Release? = withContext(Dispatchers.IO) {
         fun requestJson(address: String): JSONObject {
             val connection = URL(address).openConnection() as HttpURLConnection
             try {

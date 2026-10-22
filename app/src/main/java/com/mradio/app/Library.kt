@@ -68,7 +68,7 @@ object Library {
      * Radio data consumption is estimated, not a measured network-byte total.
      */
     fun recordListening(durationMs: Long, bitrateKbps: Int?, transport: String) {
-        if (durationMs <= 0L || durationMs > 15_000L) return
+        if (durationMs <= 0L || durationMs > 60_000L) return
         val previous = _listeningStats.value
         val bytes = bitrateKbps?.takeIf { it in 8..2_000 }
             ?.let { it.toLong() * durationMs / 8L } ?: 0L

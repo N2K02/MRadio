@@ -50,6 +50,7 @@ class RadioQuickTileService : TileService() {
         }
     }
 
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
     private fun launchApp() {
         val activity = android.app.PendingIntent.getActivity(
             this, 0, android.content.Intent(this, MainActivity::class.java),

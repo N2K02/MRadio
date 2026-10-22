@@ -94,10 +94,45 @@ class PlaybackService : MediaLibraryService() {
     private var waitingForNetwork = false
     private var retryRound = 0
     private var retryJob: Job? = null
+    private var networkWatchdog: Job? = null
+    private var selectionEpoch = 0L
+    private val listening = ListeningSessionTracker(SystemClock::elapsedRealtime, Library::recordListening)
+    private var listeningJob: Job? = null
+
+    private fun networkTransport(): String {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        return when {
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "mobile"
+            else -> "unknown"
+        }
+    }
+
+    private fun updateListening(active: Boolean) {
+        if (!active) {
+            listening.stop()
+            listeningJob?.cancel()
+            listeningJob = null
+            return
+        }
+        if (listening.isActive) return
+        listening.start(networkTransport(), Library.audio.value?.bitrateKbps)
+        listeningJob = scope.launch {
+            while (true) {
+                delay(60_000L)
+                listening.update(networkTransport(), Library.audio.value?.bitrateKbps)
+                listening.checkpoint()
+            }
+        }
+    }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         // Runs on a system thread; hop to the main thread before touching the player.
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            scope.launch {
+                listening.update(networkTransport(), Library.audio.value?.bitrateKbps)
+            }
             if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             ) {
@@ -166,6 +201,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                updateListening(isPlaying)
                 RadioWidgetProvider.refresh(this@PlaybackService, current?.name, isPlaying)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     TileService.requestListeningState(
@@ -199,27 +235,6 @@ class PlaybackService : MediaLibraryService() {
             .setMediaButtonPreferences(notificationButtons())
             .build()
 
-        // Record only seconds spent actually playing; a stalled/buffering stream does not count.
-        // Reading the default network each sample attributes estimates to the observed transport.
-        scope.launch {
-            var previous = SystemClock.elapsedRealtime()
-            while (true) {
-                delay(5_000L)
-                val now = SystemClock.elapsedRealtime()
-                val delta = (now - previous).coerceIn(0L, 5_000L)
-                previous = now
-                if (player.isPlaying && player.playbackState == Player.STATE_READY && current != null) {
-                    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-                    val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-                    val transport = when {
-                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
-                        caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "mobile"
-                        else -> "unknown"
-                    }
-                    Library.recordListening(delta, Library.audio.value?.bitrateKbps, transport)
-                }
-            }
-        }
 
         // The notification's heart shows only while the station isn't in Favourite Radios.
         scope.launch { Library.mine.collect { refreshButtons() } }
@@ -262,6 +277,7 @@ class PlaybackService : MediaLibraryService() {
             stationName = icy?.name,
             genre = icy?.genre,
         )
+        listening.update(networkTransport(), Library.audio.value?.bitrateKbps)
     }
 
     /**
@@ -340,13 +356,14 @@ class PlaybackService : MediaLibraryService() {
         CommandButton.Builder(CommandButton.ICON_UNDEFINED)
             .setCustomIconResId(R.drawable.ic_exit)
             .setSessionCommand(StationCommands.EXIT)
-            .setDisplayName("Exit")
+            .setDisplayName("Quit radio")
             .setSlots(CommandButton.SLOT_OVERFLOW)
             .build(),
     )
 
     /** Exit: stop the radio, remove the notification, close the app screen if it is open. */
     private fun exitApp() {
+        updateListening(false)
         current = null
         cancelRetry()
         setSleepTimer(0)
@@ -382,6 +399,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        updateListening(false)
         runCatching {
             (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
                 .unregisterNetworkCallback(networkCallback)
@@ -396,6 +414,7 @@ class PlaybackService : MediaLibraryService() {
 
     /** Sets up the fallback queue for [station] and returns the item for its best stream. */
     private fun startStation(station: Station): MediaItem {
+        selectionEpoch++
         current = station
         Library.recordPlayed(station)
         Library.logPlayback("Selected · ${station.name}")
@@ -430,7 +449,7 @@ class PlaybackService : MediaLibraryService() {
         if (wasPlaying) {
             wasPlaying = false
             val url = queue.getOrNull(attempt) ?: return
-            scheduleRetry(station, 2000) { play(station, url) }
+            scheduleRetry(station, nextBackoff()) { play(station, url) }
             return
         }
 
@@ -443,7 +462,7 @@ class PlaybackService : MediaLibraryService() {
             lookedUpOnline = true
             scope.launch {
                 val backups = Directory.alternates(station).filterNot { it in queue }
-                if (current?.id != station.id) return@launch
+                if (current?.id != station.id || !player.playWhenReady) return@launch
                 if (backups.isEmpty()) {
                     gaveUp(station)
                     return@launch
@@ -476,12 +495,18 @@ class PlaybackService : MediaLibraryService() {
 
     // ---------------------------------------------------------------- reconnect
 
-    /** Waits for the connection to return; a timer retries anyway in case the network never reports as validated. */
+    /** Prefer the validated-network callback; a bounded watchdog covers missed callbacks. */
     private fun waitForNetwork(station: Station) {
         waitingForNetwork = true
-        scheduleRetry(station, nextBackoff()) {
-            waitingForNetwork = false
-            restartCycle(station)
+        retryJob?.cancel()
+        networkWatchdog?.cancel()
+        val epoch = selectionEpoch
+        // Callback-first recovery with a low-frequency fallback for missed Android events.
+        networkWatchdog = scope.launch {
+            while (waitingForNetwork && current?.id == station.id && selectionEpoch == epoch && player.playWhenReady) {
+                delay(15_000L)
+                if (hasNetwork()) onNetworkBack()
+            }
         }
     }
 
@@ -489,8 +514,10 @@ class PlaybackService : MediaLibraryService() {
     private fun onNetworkBack() {
         if (!waitingForNetwork) return
         val station = current ?: return
+        if (!hasNetwork() || !player.playWhenReady) return
+        networkWatchdog?.cancel()
+        networkWatchdog = null
         waitingForNetwork = false
-        retryRound = 0
         // Give the connection a moment to settle before reconnecting.
         scheduleRetry(station, 1500) { restartCycle(station) }
     }
@@ -505,22 +532,25 @@ class PlaybackService : MediaLibraryService() {
 
     private fun scheduleRetry(station: Station, delayMs: Long, action: () -> Unit) {
         retryJob?.cancel()
+        val epoch = selectionEpoch
         retryJob = scope.launch {
             delay(delayMs)
-            if (current?.id != station.id || !player.playWhenReady) return@launch
+            if (current?.id != station.id || selectionEpoch != epoch || !player.playWhenReady) return@launch
             action()
         }
     }
 
     private fun cancelRetry() {
         retryJob?.cancel()
+        networkWatchdog?.cancel()
+        networkWatchdog = null
         waitingForNetwork = false
         retryRound = 0
     }
 
-    /** 3s, 5s, 10s, 20s, then every 30s. */
+    /** Back off repeated stream failures: 5s, 10s, 20s, 40s, 60s, then 120s. */
     private fun nextBackoff(): Long {
-        val steps = longArrayOf(3_000, 5_000, 10_000, 20_000, 30_000)
+        val steps = longArrayOf(5_000, 10_000, 20_000, 40_000, 60_000, 120_000)
         return steps[minOf(retryRound++, steps.size - 1)]
     }
 
@@ -739,7 +769,7 @@ class PlaybackService : MediaLibraryService() {
                     LibraryResult.ofItemList(visible.map { browseItem(it, artwork = true) }, params)
                 }
                 else -> Futures.immediateFuture(
-                    LibraryResult.ofError<ImmutableList<MediaItem>>(LibraryResult.RESULT_ERROR_BAD_VALUE),
+                    LibraryResult.ofError<ImmutableList<MediaItem>>(SessionError.ERROR_BAD_VALUE),
                 )
             }
         }
@@ -756,7 +786,7 @@ class PlaybackService : MediaLibraryService() {
             return future {
                 val station = resolve(mediaId)
                 if (station == null) {
-                    LibraryResult.ofError<MediaItem>(LibraryResult.RESULT_ERROR_BAD_VALUE)
+                    LibraryResult.ofError<MediaItem>(SessionError.ERROR_BAD_VALUE)
                 } else {
                     LibraryResult.ofItem(browseItem(station, artwork = true), null)
                 }
