@@ -66,6 +66,7 @@ private tailrec fun Context.activity(): Activity? = when (this) {
 @Composable
 fun UpdateCard(modifier: Modifier = Modifier) {
     val state by AppUpdater.state.collectAsState()
+    val experimentalEnabled by AppUpdater.experimentalEnabled.collectAsState()
     var diagnosticsVisible by remember { mutableStateOf(false) }
     LaunchedEffect(state) { if (state !is AppUpdater.State.Failed) diagnosticsVisible = false }
     val activity = LocalContext.current.activity()
@@ -93,7 +94,7 @@ fun UpdateCard(modifier: Modifier = Modifier) {
                     is AppUpdater.State.Checking -> {
                         Title("Checking for updates…")
                         LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text(if (AppUpdater.experimentalEnabled.value) "Checking successful experimental builds and stable releases." else "Contacting GitHub for the latest release.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (experimentalEnabled) "Checking successful experimental builds and stable releases." else "Contacting GitHub for the latest release.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     is AppUpdater.State.UpToDate -> {
                         Title("You're up to date")
