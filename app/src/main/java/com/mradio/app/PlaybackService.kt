@@ -94,6 +94,8 @@ class PlaybackService : MediaLibraryService() {
     private var waitingForNetwork = false
     private var retryRound = 0
     private var retryJob: Job? = null
+    private var networkWatchdog: Job? = null
+    private var selectionEpoch = 0L
     private val listening = ListeningSessionTracker(SystemClock::elapsedRealtime, Library::recordListening)
     private var listeningJob: Job? = null
 
@@ -412,6 +414,7 @@ class PlaybackService : MediaLibraryService() {
 
     /** Sets up the fallback queue for [station] and returns the item for its best stream. */
     private fun startStation(station: Station): MediaItem {
+        selectionEpoch++
         current = station
         Library.recordPlayed(station)
         Library.logPlayback("Selected · ${station.name}")
@@ -459,7 +462,7 @@ class PlaybackService : MediaLibraryService() {
             lookedUpOnline = true
             scope.launch {
                 val backups = Directory.alternates(station).filterNot { it in queue }
-                if (current?.id != station.id) return@launch
+                if (current?.id != station.id || !player.playWhenReady) return@launch
                 if (backups.isEmpty()) {
                     gaveUp(station)
                     return@launch
@@ -492,12 +495,19 @@ class PlaybackService : MediaLibraryService() {
 
     // ---------------------------------------------------------------- reconnect
 
-    /** Waits for the connection to return; a timer retries anyway in case the network never reports as validated. */
+    /** Prefer the validated-network callback; a bounded watchdog covers missed callbacks. */
     private fun waitForNetwork(station: Station) {
         waitingForNetwork = true
-        // Do not wake the radio periodically while disconnected. The validated-network
-        // callback (or a manual Play action) starts a fresh attempt when connectivity returns.
         retryJob?.cancel()
+        networkWatchdog?.cancel()
+        val epoch = selectionEpoch
+        // Callback-first recovery with a low-frequency fallback for missed Android events.
+        networkWatchdog = scope.launch {
+            while (waitingForNetwork && current?.id == station.id && selectionEpoch == epoch && player.playWhenReady) {
+                delay(15_000L)
+                if (hasNetwork()) onNetworkBack()
+            }
+        }
     }
 
     /** Called when a validated internet connection appears. */
@@ -505,6 +515,8 @@ class PlaybackService : MediaLibraryService() {
         if (!waitingForNetwork) return
         val station = current ?: return
         if (!hasNetwork() || !player.playWhenReady) return
+        networkWatchdog?.cancel()
+        networkWatchdog = null
         waitingForNetwork = false
         // Give the connection a moment to settle before reconnecting.
         scheduleRetry(station, 1500) { restartCycle(station) }
@@ -520,15 +532,18 @@ class PlaybackService : MediaLibraryService() {
 
     private fun scheduleRetry(station: Station, delayMs: Long, action: () -> Unit) {
         retryJob?.cancel()
+        val epoch = selectionEpoch
         retryJob = scope.launch {
             delay(delayMs)
-            if (current?.id != station.id || !player.playWhenReady) return@launch
+            if (current?.id != station.id || selectionEpoch != epoch || !player.playWhenReady) return@launch
             action()
         }
     }
 
     private fun cancelRetry() {
         retryJob?.cancel()
+        networkWatchdog?.cancel()
+        networkWatchdog = null
         waitingForNetwork = false
         retryRound = 0
     }
