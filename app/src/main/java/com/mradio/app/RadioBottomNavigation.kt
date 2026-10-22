@@ -6,6 +6,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 internal fun RadioBottomNavigation(
     destination: RadioDestination,
     settingsSelected: Boolean,
+    updateAvailable: Boolean,
     onHome: () -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
@@ -47,7 +49,11 @@ internal fun RadioBottomNavigation(
         NavigationBarItem(
             selected = settingsSelected,
             onClick = onSettings,
-            icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+            icon = {
+                BadgedBox(badge = { if (updateAvailable) UpdateAvailableBadge() }) {
+                    Icon(Icons.Rounded.Settings, contentDescription = if (updateAvailable) "Settings, update available" else null)
+                }
+            },
             label = { Text("Settings") },
             alwaysShowLabel = true,
         )
