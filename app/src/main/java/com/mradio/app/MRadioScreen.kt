@@ -1218,136 +1218,13 @@ private fun RetryMessage(text: String, onRetry: () -> Unit) {
  * - in Favourite Radios: − to take it out,
  * - elsewhere: the heart (empty = tap to add to Favourite Radios, filled = already there).
  */
-@Composable
-private fun StationRow(
-    station: Station,
-    isCurrent: Boolean,
-    isPlaying: Boolean,
-    isPlayRequested: Boolean,
-    inMineSection: Boolean,
-    isMine: Boolean,
-    isBroken: Boolean,
-    fromDirectory: Boolean,
-    onClick: () -> Unit,
-    onHeart: () -> Unit,
-    onRemove: () -> Unit,
-    onInfo: () -> Unit,
-    onCopy: () -> Unit,
-    onShare: () -> Unit,
-    onCopyInfo: () -> Unit,
-    isPinned: Boolean = false,
-    onPin: (() -> Unit)? = null,
-    onMoveUp: (() -> Unit)? = null,
-    onMoveDown: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    // Only the selected row animates; all other rows remain static and inexpensive.
-    val rowColor by animateColorAsState(
-        targetValue = if (isCurrent) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerLow,
-        animationSpec = tween(durationMillis = 240),
-        label = "Station selection",
-    )
-    ListItem(
-        headlineContent = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(station.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
-                    modifier = Modifier.weight(1f, fill = false))
-                if (isCurrent) {
-                    PlaybackStatusDot(playing = isPlaying, failed = isBroken)
-                }
-            }
-        },
-        supportingContent = {
-            val line = when {
-                isBroken -> "Not available right now"
-                fromDirectory && station.country.length == 2 && station.country != "MU" ->
-                    "${flagEmoji(station.country)} ${station.subtitle}"
-                else -> station.subtitle
-            }
-            Text(
-                line,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = if (isBroken) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        },
-        leadingContent = { StationBadge(station, spinning = isPlaying, size = 46) },
-        trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
-                    Icon(
-                        if (isPlayRequested) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (isPlayRequested) "Pause ${station.name}" else "Play ${station.name}",
-                    )
-                }
-                var menuOpen by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "More options for ${station.name}")
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(if (isMine) "Remove from Favorites" else "Add to Favorites") },
-                            onClick = { menuOpen = false; onHeart() },
-                            leadingIcon = {
-                                Icon(if (isMine) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, null)
-                            },
-                        )
-                        if (inMineSection && onPin != null) {
-                            DropdownMenuItem(
-                                text = { Text(if (isPinned) "Unpin" else "Pin to top") },
-                                onClick = { menuOpen = false; onPin() },
-                                leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text("Share station") },
-                            onClick = { menuOpen = false; onShare() },
-                            leadingIcon = { Icon(Icons.Rounded.Share, null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Copy station information") },
-                            onClick = { menuOpen = false; onCopyInfo() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Copy stream URL") },
-                            onClick = { menuOpen = false; onCopy() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Station details") },
-                            onClick = { menuOpen = false; onInfo() },
-                            leadingIcon = { Icon(Icons.Rounded.Info, null) },
-                        )
-                        if (inMineSection && onMoveUp != null && onMoveDown != null) {
-                            DropdownMenuItem(text = { Text("Move up") },
-                                onClick = { menuOpen = false; onMoveUp() })
-                            DropdownMenuItem(text = { Text("Move down") },
-                                onClick = { menuOpen = false; onMoveDown() })
-                        }
-                    }
-                }
-            }
-        },
-        colors = ListItemDefaults.colors(
-            containerColor = rowColor,
-        ),
-        modifier = modifier
-            .padding(horizontal = 16.dp, vertical = 3.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
-    )
-}
-
 /**
  * The station's logo on an expressive Material shape. The shape turns slowly behind the
  * logo while the station plays. Without a logo (or while it loads) the initials show instead.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
+internal fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
     val scheme = MaterialTheme.colorScheme
     var logo by remember(station.id) { mutableStateOf(Library.logo(station)) }
     LaunchedEffect(station.id) {
@@ -1383,7 +1260,7 @@ private fun StationBadge(station: Station, spinning: Boolean, size: Int = 52) {
 
 /** Shared playback indicator for Home, favourite rows, mini-player and full player. */
 @Composable
-private fun PlaybackStatusDot(playing: Boolean, failed: Boolean) {
+internal fun PlaybackStatusDot(playing: Boolean, failed: Boolean) {
     val label = when {
         failed -> "Playback error"
         playing -> "Playing"
