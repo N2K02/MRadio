@@ -140,8 +140,14 @@ jobs:
           rm -rf "$K"
           "$BT/apksigner" verify --print-certs "$APK_NAME.apk" | grep -E "Signer.*(DN|SHA-256 digest)"
 
-      # We can build/test without the distribution credential, but do not publish publicly
-      # until MRADIO_DISTRIBUTION_TOKEN is configured in this source repository.
+      # Preserve the signed APK even if optional public distribution is unavailable.
+      - name: Upload signed APK (workflow artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_NAME }}.apk
+          if-no-files-found: error
+
       - name: Check public distribution configuration
         id: distribution
         env:
@@ -151,11 +157,7 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::MRADIO_DISTRIBUTION_TOKEN is missing; signed APK can be built but public updates cannot be published."
-            if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-              echo "::error::Stable distribution is required. Configure MRADIO_DISTRIBUTION_TOKEN with Contents read/write permission on N2K02/n2k02.github.io."
-              exit 1
-            fi
+            echo "::warning::MRADIO_DISTRIBUTION_TOKEN is not available. Signed APK is preserved as a workflow artifact, but the public stable/experimental update channels cannot be published until the secret is configured in this repository."
           fi
 
       - name: Publish stable or experimental APK to public distribution
@@ -164,11 +166,3 @@ jobs:
           GH_TOKEN: ${{ secrets.MRADIO_DISTRIBUTION_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bash .github/scripts/publish-distribution.sh
-
-      - name: Upload APK (workflow artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.APK_NAME }}
-          path: ${{ env.APK_NAME }}.apk
-          if-no-files-found: error
-
