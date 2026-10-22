@@ -146,7 +146,7 @@ fun RadioSettings(
             }.getOrElse { "Import failed: ${it.message}" }
         }
     }
-    var page by rememberSaveable { mutableStateOf("Settings") }
+    var page by rememberSaveable { mutableStateOf(SettingsDestination.MAIN) }
     var editingStation by remember { mutableStateOf<Station?>(null) }
     var stationEditorOpen by remember { mutableStateOf(false) }
     var stationName by remember { mutableStateOf("") }
@@ -165,18 +165,18 @@ fun RadioSettings(
     }
     // The settings content is embedded in the parent Scaffold, so bottom navigation
     // stays visible. System Back returns to the main Settings list from subsections.
-    BackHandler(enabled = page != "Settings") { page = "Settings" }
+    BackHandler(enabled = page != SettingsDestination.MAIN) { page = SettingsDestination.MAIN }
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Scaffold(
                 topBar = {
-                    if (page != "Settings") {
+                    if (page != SettingsDestination.MAIN) {
                         TopAppBar(
-                            title = { Text(page) },
+                            title = { Text(page.title) },
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.background,
                             ),
                             navigationIcon = {
-                                IconButton(onClick = { page = "Settings" }) {
+                                IconButton(onClick = { page = SettingsDestination.MAIN }) {
                                     Icon(Icons.Rounded.ArrowBack, contentDescription = "Back to Settings")
                                 }
                             },
@@ -194,7 +194,7 @@ fun RadioSettings(
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        if (current == "Settings") {
+                        if (current == SettingsDestination.MAIN) {
                             Text(
                                 "Make listening your own",
                                 style = MaterialTheme.typography.titleMedium,
@@ -205,40 +205,40 @@ fun RadioSettings(
                                 headlineContent = { Text("Playback & audio") },
                                 supportingContent = { Text("Auto-play and equalizer") },
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
-                                modifier = Modifier.clickable { page = "Playback & audio" },
+                                modifier = Modifier.clickable { page = SettingsDestination.PLAYBACK },
                             )
                             ListItem(
                                 headlineContent = { Text("Radio alarm") },
                                 supportingContent = { Text("Schedule a station to play at a chosen time") },
                                 leadingContent = { Icon(Icons.Rounded.Alarm, null) },
-                                modifier = Modifier.clickable { page = "Radio alarm" },
+                                modifier = Modifier.clickable { page = SettingsDestination.ALARM },
                             )
                             ListItem(
                                 headlineContent = { Text("Listening statistics") },
                                 supportingContent = { Text("Time listened and estimated Wi-Fi / mobile streaming") },
                                 leadingContent = { Icon(Icons.Rounded.BarChart, null) },
-                                modifier = Modifier.clickable { page = "Listening statistics" },
+                                modifier = Modifier.clickable { page = SettingsDestination.STATISTICS },
                             )
                             ListItem(
                                 headlineContent = { Text("Custom stations") },
                                 supportingContent = { Text("Add and edit your own station stream URLs") },
                                 leadingContent = { Icon(Icons.Rounded.AddCircleOutline, null) },
-                                modifier = Modifier.clickable { page = "Custom stations" },
+                                modifier = Modifier.clickable { page = SettingsDestination.CUSTOM_STATIONS },
                             )
                             ListItem(
                                 headlineContent = { Text("Backup & restore") },
                                 supportingContent = { Text("Export or restore favorites, custom stations, and preferences") },
                                 leadingContent = { Icon(Icons.Rounded.Save, null) },
-                                modifier = Modifier.clickable { page = "Backup & restore" },
+                                modifier = Modifier.clickable { page = SettingsDestination.BACKUP },
                             )
                             HorizontalDivider()
                             ListItem(
                                 headlineContent = { Text("About & updates") },
                                 supportingContent = { Text("App version and update checks") },
                                 leadingContent = { Icon(Icons.Rounded.Info, null) },
-                                modifier = Modifier.clickable { page = "About & updates" },
+                                modifier = Modifier.clickable { page = SettingsDestination.UPDATES },
                             )
-                        } else if (current == "Playback & audio") {
+                        } else if (current == SettingsDestination.PLAYBACK) {
                             ListItem(
                                 headlineContent = { Text("Auto-play on phone") },
                                 supportingContent = { Text("Play the last station when opening the app") },
@@ -262,7 +262,7 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { onEqualizer() },
                             )
-                        } else if (current == "Radio alarm") {
+                        } else if (current == SettingsDestination.ALARM) {
                             // Only saved playable stations survive a cold start or device reboot.
                             val available = (Library.myStations() + stationList)
                                 .filter { it.streams.isNotEmpty() }
@@ -354,7 +354,7 @@ fun RadioSettings(
                                     Text(message, color = MaterialTheme.colorScheme.error)
                                 })
                             }
-                        } else if (current == "Custom stations") {
+                        } else if (current == SettingsDestination.CUSTOM_STATIONS) {
                             ListItem(
                                 headlineContent = { Text("Add station") },
                                 supportingContent = { Text("Add an HTTP or HTTPS stream to your favorites") },
@@ -404,7 +404,7 @@ fun RadioSettings(
                                     )
                                 }
                             }
-                        } else if (current == "Backup & restore") {
+                        } else if (current == SettingsDestination.BACKUP) {
                             ListItem(
                                 headlineContent = { Text("Export backup") },
                                 supportingContent = { Text("Save favorites, pinned stations, custom stations, and playback preferences to a JSON file") },
@@ -431,7 +431,7 @@ fun RadioSettings(
                                     },
                                 )
                             }
-                        } else if (current == "Listening statistics") {
+                        } else if (current == SettingsDestination.STATISTICS) {
                             val hours = listeningStats.listeningMs / 3_600_000L
                             val minutes = (listeningStats.listeningMs / 60_000L) % 60L
                             fun usage(bytes: Long): String = String.format(java.util.Locale.US, "%.1f MB", bytes / 1_000_000.0)
@@ -471,7 +471,7 @@ fun RadioSettings(
                                     TextButton(onClick = Library::clearListeningStats) { Text("Reset") }
                                 },
                             )
-                        } else if (current == "Diagnostics") {
+                        } else if (current == SettingsDestination.DIAGNOSTICS) {
                             ListItem(
                                 headlineContent = { Text("Playback events") },
                                 supportingContent = { Text("Session-only activity; no stream URLs or personal data") },
@@ -491,7 +491,7 @@ fun RadioSettings(
                                 headlineContent = { Text("Connection diagnostics") },
                                 supportingContent = { Text("Playback, buffering and stream errors") },
                                 leadingContent = { Icon(Icons.Rounded.BugReport, null) },
-                                modifier = Modifier.clickable { page = "Diagnostics" },
+                                modifier = Modifier.clickable { page = SettingsDestination.DIAGNOSTICS },
                             )
                             ListItem(
                                 headlineContent = { Text("MRadio") },
