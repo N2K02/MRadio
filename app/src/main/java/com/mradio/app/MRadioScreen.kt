@@ -312,9 +312,17 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     }
     // Home favourites must not disappear when filters are changed on the Search page.
     val visibleMine = myList
-    val visibleMore = filtered(moreList)
-    val localResults = filtered(Library.searchLocal(query))
-    val onlineResults = online?.let { filtered(it.filterNot { station -> Library.known(station) || Library.isHidden(station) }) }
+    val visibleMore = remember(moreList, selectedGenre, stationSort, workingOnly, broken) {
+        filtered(moreList)
+    }
+    val localResults = remember(query, selectedGenre, stationSort, workingOnly, broken, stations, hidden) {
+        filtered(Library.searchLocal(query))
+    }
+    val onlineResults = remember(online, selectedGenre, stationSort, workingOnly, broken, hidden, stations) {
+        online?.let { result ->
+            filtered(result.filterNot { station -> Library.known(station) || Library.isHidden(station) })
+        }
+    }
 
     val current = player.mediaId?.let { id -> Library.find(id) }
     val currentBroken = current != null && current.id in broken
@@ -533,40 +541,14 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                    NavigationBar(
-                        modifier = Modifier.fillMaxWidth(),
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 0.dp,
-                    ) {
-                        NavigationBarItem(
-                            selected = homeTab == RadioDestination.HOME && !settingsMenu,
-                            onClick = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false },
-                            icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
-                            label = { Text("Home") },
-                            alwaysShowLabel = true,
-                        )
-                        NavigationBarItem(
-                            selected = homeTab == RadioDestination.SEARCH && !settingsMenu,
-                            onClick = { homeTab = RadioDestination.SEARCH; settingsMenu = false },
-                            icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                            label = { Text("Search") },
-                            alwaysShowLabel = true,
-                        )
-                        NavigationBarItem(
-                            selected = settingsMenu,
-                            onClick = { settingsMenu = true },
-                            icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-                            label = { Text("Settings") },
-                            alwaysShowLabel = true,
-                        )
-                        NavigationBarItem(
-                            selected = false,
-                            onClick = onExit,
-                            icon = { Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Quit mRadio") },
-                            label = { Text("Quit") },
-                            alwaysShowLabel = true,
-                        )
-                    }
+                    RadioBottomNavigation(
+                        destination = homeTab,
+                        settingsSelected = settingsMenu,
+                        onHome = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false },
+                        onSearch = { homeTab = RadioDestination.SEARCH; settingsMenu = false },
+                        onSettings = { settingsMenu = true },
+                        onExit = onExit,
+                    )
                 }
                 }
             },
@@ -639,7 +621,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                     }) {
                                         Icon(
                                             if (Library.inMine(current)) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                                            contentDescription = "Toggle favorite",
+                                            contentDescription = if (Library.inMine(current)) "Remove ${current.name} from favourites" else "Add ${current.name} to favourites",
                                         )
                                     }
                                 }
