@@ -68,6 +68,8 @@ fun RadioSettings(
     val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
     val experimentalEnabled by AppUpdater.experimentalEnabled.collectAsState()
+    val updaterState by AppUpdater.state.collectAsState()
+    val updateAvailable = updaterState.hasPendingUpdate()
     val playbackEvents by Library.events.collectAsState()
     val listeningStats by Library.listeningStats.collectAsState()
     val stationList by Library.stations.collectAsState()
@@ -229,8 +231,9 @@ fun RadioSettings(
                             HorizontalDivider()
                             ListItem(
                                 headlineContent = { Text("About & updates") },
-                                supportingContent = { Text("App version and update checks") },
+                                supportingContent = { Text(if (updateAvailable) "A new update is available" else "App version and update checks") },
                                 leadingContent = { Icon(Icons.Rounded.Info, null) },
+                                trailingContent = { if (updateAvailable) UpdateAvailableBadge() },
                                 modifier = Modifier.clickable { page = SettingsDestination.UPDATES },
                             )
                         } else if (current == SettingsDestination.PLAYBACK) {
@@ -509,8 +512,9 @@ fun RadioSettings(
                             HorizontalDivider()
                             ListItem(
                                 headlineContent = { Text("Check for updates") },
-                                supportingContent = { Text(if (experimentalEnabled) "Check latest green PR build and official releases" else "Check official GitHub releases") },
+                                supportingContent = { Text(if (updateAvailable) "Update available — review below" else if (experimentalEnabled) "Check latest green PR build and official releases" else "Check official GitHub releases") },
                                 leadingContent = { Icon(Icons.Rounded.SystemUpdate, null) },
+                                trailingContent = { if (updateAvailable) UpdateAvailableBadge() },
                                 modifier = Modifier.clickable { onCheckUpdates() },
                             )
                             UpdateCard(
