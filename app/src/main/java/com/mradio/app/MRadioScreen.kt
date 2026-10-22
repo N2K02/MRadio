@@ -298,14 +298,13 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             .entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .take(18).map { it.key }
     }
-    fun filtered(items: List<Station>): List<Station> {
-        val eligible = items.filter {
-            (selectedGenre == "All genres" ||
-                it.tags.split(',').any { tag -> tag.trim().equals(selectedGenre, ignoreCase = true) }) &&
-                (!workingOnly || it.id !in broken)
-        }
-        return if (stationSort == "Name") eligible.sortedBy { it.name.lowercase(Locale.ROOT) } else eligible
-    }
+    fun filtered(items: List<Station>): List<Station> = StationFilter.apply(
+        stations = items,
+        genre = selectedGenre,
+        workingOnly = workingOnly,
+        brokenIds = broken.keys,
+        sortByName = stationSort == "Name",
+    )
     val myList = remember(stations, mine, pinned, hidden) { Library.myStations() }
     val moreList = remember(stations, mine, discovered, place, hidden) {
         Library.moreStations(discovered.orEmpty(), mauritius = place == Directory.MAURITIUS)
