@@ -532,6 +532,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     RadioBottomNavigation(
                         destination = homeTab,
                         settingsSelected = settingsMenu,
+                        updateAvailable = updateState.hasPendingUpdate(),
                         onHome = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false },
                         onSearch = { homeTab = RadioDestination.SEARCH; settingsMenu = false },
                         onSettings = { settingsMenu = true },
