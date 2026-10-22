@@ -1,0 +1,45 @@
+name: Publish existing mRadio 3.8 APK
+
+on:
+  push:
+    paths:
+      - '.github/workflows/republish-3-8.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate website distribution credential
+        env:
+          DISTRIBUTION_TOKEN: ${{ secrets.ANDROID_DISTRIBUTION_TOKEN }}
+        run: |
+          if [ -z "$DISTRIBUTION_TOKEN" ]; then
+            echo "::error::ANDROID_DISTRIBUTION_TOKEN is unavailable in the MRadio repository. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Download previously signed mRadio 3.8 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v3.8 --repo "$GITHUB_REPOSITORY" --pattern 'MRadio-3.8.apk' --clobber
+          test -s MRadio-3.8.apk
+          gh release view v3.8 --repo "$GITHUB_REPOSITORY" --json body --jq .body > release-notes.md
+          test -s release-notes.md || printf '%s\n' 'mRadio 3.8 stable release' > release-notes.md
+
+      - name: Publish original 3.8 APK and stable manifest
+        env:
+          GH_TOKEN: ${{ secrets.ANDROID_DISTRIBUTION_TOKEN }}
+          APP: MRadio
+          APK_NAME: MRadio-3.8
+          VERSION: '3.8'
+          VERSION_CODE: '100202'
+          GITHUB_RUN_NUMBER: '202'
+          GITHUB_EVENT_NAME: push
+        run: bash .github/scripts/publish-distribution.sh
