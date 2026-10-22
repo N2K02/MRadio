@@ -6,7 +6,7 @@
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**[Download mRadio](https://github.com/N2K02/MRadio/releases/latest)** · Free and open source
+**[Explore the mRadio website](https://n2k02.github.io/mradio/)** · **[Download mRadio](https://github.com/N2K02/MRadio/releases/latest)** · Free and open source
 
 ## What you can do
 
@@ -43,6 +43,6 @@ Found a broken station, a bug, or have an idea? [Open an issue](https://github.c
 
 mRadio is an open-source Android app written in Kotlin.
 
-**[Releases](https://github.com/N2K02/MRadio/releases)** · **[Source code](https://github.com/N2K02/MRadio)** · **[License](LICENSE)**
+**[mRadio website](https://n2k02.github.io/mradio/)** · **[Releases](https://github.com/N2K02/MRadio/releases)** · **[Source code](https://github.com/N2K02/MRadio)** · **[License](LICENSE)**
 
 Radio streams are provided by their respective broadcasters and third-party directories; availability may vary.
