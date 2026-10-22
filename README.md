@@ -6,7 +6,7 @@
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**[Explore the mRadio website](https://n2k02.github.io/mradio/)** · **[Download mRadio](https://github.com/N2K02/MRadio/releases/latest)** · Free and open source
+**[Explore the mRadio website](https://n2k02.github.io/mradio/)** · **[Download mRadio](https://n2k02.github.io/mradio/download/)** · Free and open source
 
 ## What you can do
 
@@ -21,7 +21,7 @@ The redesigned interface keeps things simple: **Home** for your favourites and p
 
 ## Get started
 
-1. **[Download the latest APK](https://github.com/N2K02/MRadio/releases/latest)** from GitHub Releases.
+1. **[Download the latest APK](https://n2k02.github.io/mradio/download/)** from the mRadio download page.
 2. Open the downloaded APK on your Android phone and follow the installation prompts.
 3. Launch **mRadio**, choose a station, and press Play.
 
