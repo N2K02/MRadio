@@ -4,7 +4,7 @@
 This branch starts from `ui-rounded-menus`, preserving the existing working updater and its settings UI. Do not remove `AppUpdater.kt`, `UpdateUi.kt`, `UpdateFileProvider.kt`, or `UpdateBadge.kt` until the replacement is feature-complete and tested.
 
 ## Shared library
-Source: private `N2K02/n2k02updater`, draft PR #1, module `updater`.
+Source: private `N2K02/n2k02updater`, merged to `main`, module `updater`.
 
 **Important:** MRadio is public and the library is private. Do not add an unauthenticated GitHub Packages dependency or commit a GitHub token to the app. Until a private dependency delivery strategy is configured (or source is deliberately made public), this branch does not enable a build-breaking dependency.
 
@@ -33,20 +33,20 @@ The shared updater is a **private Android library** while MRadio is public. The 
 Default CI and local builds **do not** resolve the private library. To test after the package is published, set `N2K02_PACKAGES_USER` and `N2K02_PACKAGES_TOKEN` in the build environment, then run:
 
 ```bash
-./gradlew :app:assembleDebug -PuseSharedUpdater=true -PsharedUpdaterVersion=0.1.0
+./gradlew :app:assembleDebug -PuseSharedUpdater=true -PsharedUpdaterVersion=0.1.0-main.2.1
 ```
 
-The token must have read access to the private package/repository. Grant access to the MRadio Actions repository explicitly if required by GitHub Packages. Never put the token in `gradle.properties` committed to Git or in the app manifest. The version above is illustrative until `0.1.0` is actually published.
+The token must have read access to the private package/repository. Grant access to the MRadio Actions repository explicitly if required by GitHub Packages. Never put the token in `gradle.properties` committed to Git or in the app manifest. The manually released stable version `0.1.0` is not verified as published. The confirmed automatic development release is `0.1.0-main.2.1`; use that version for initial CI integration.
 
 ## Current status
-Preparation only. No runtime behavior changed. An opt-in Maven repository and dependency have been introduced, but are disabled for ordinary builds; the private package is not yet published.
+The private library now publishes development packages automatically from `main`. The publishing workflow for `dev.n2k02:updater:0.1.0-main.2.1` succeeded in [run 39930837084](https://github.com/N2K02/n2k02updater/actions/runs/39930837084). MRadio's runtime remains unchanged; ordinary builds still do not resolve the package. Private-package consumption is not yet verified, pending CI access credentials.
 
 ## Integration CI validation (2026-10-23)
 
 The feature-branch workflow `Shared updater integration checks` passed its baseline job in run [39921856850](https://github.com/N2K02/MRadio/actions/runs/39921856850). Its private-dependency job was **skipped as designed**: no published version was configured. The baseline proves default builds remain intact, **not** that the private AAR can resolve or that the new updater is wired into runtime UI.
 
-To activate the separate dependency check after a package is published:
-1. Configure repository variable `SHARED_UPDATER_VERSION` with the published version.
+To activate the separate dependency check using the published development package:
+1. Configure repository variable `SHARED_UPDATER_VERSION` with `0.1.0-main.2.1`.
 2. Configure repository variable `N2K02_PACKAGES_USER` with the authorized GitHub account.
 3. Configure repository Actions secret `N2K02_PACKAGES_TOKEN` with read-only package access.
 4. Run the workflow on the integration branch and verify `private-dependency` succeeds.
