@@ -60,3 +60,11 @@ The feature branch now contains `app/src/sharedUpdater/java/com/mradio/app/Share
 ## Authentication hardening (2026-10-23)
 
 The opt-in `private-dependency` CI job supports GitHub's short-lived `GITHUB_TOKEN` with `packages: read`, provided the private package explicitly grants this repository Actions access. An optional custom read-only package token remains supported as a fallback. This avoids requiring a persistent PAT for the normal case. CI never runs the private-dependency job on pull-request events; it runs only on branch pushes or manual dispatch once `SHARED_UPDATER_VERSION` is set. The package has not yet been resolved in MRadio CI, so runtime migration remains blocked on that verification.
+
+## Single release channel status (2026-10-23)
+
+Both shared libraries now use a single numeric release channel. The automatic `main` publishing workflows successfully published `dev.n2k02:theme:0.1.3` and `dev.n2k02:updater:0.1.3` ([theme run](https://github.com/N2K02/n2k02theme/actions/runs/39933666981), [updater run](https://github.com/N2K02/n2k02updater/actions/runs/39933678716)). Existing `0.1.0-main.*` packages are historical and no longer the desired integration target.
+
+**Updater blocker:** a request-connection lifecycle issue was found in the shipped `0.1.3` manifest downloader. The fix is under review in [updater PR #4](https://github.com/N2K02/n2k02updater/pull/4). Do not switch MRadio's runtime to the shared manifest loader until a corrected numeric package has been published and compiled by the private-dependency job. The next automatic release is expected to use the next workflow run number; verify the actual published version instead of assuming it.
+
+**Still required:** grant `N2K02/MRadio` read access to the private updater GitHub Package, then set the repository Actions variable `SHARED_UPDATER_VERSION` to the verified corrected release version. The default MRadio build and its current updater remain unchanged.
