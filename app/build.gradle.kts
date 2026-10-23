@@ -55,7 +55,7 @@ android {
 dependencies {
     // Off by default until the private package and CI read-only credentials are ready.
     if (providers.gradleProperty("useSharedUpdater").orNull == "true") {
-        implementation("dev.n2k02:updater:0.1.4")
+        implementation("dev.n2k02:updater:0.1.5")
     }
     // Material 3 Expressive (MaterialExpressiveTheme, expressive shapes/motion/components)
     implementation("androidx.compose.material3:material3:1.5.0-beta01")
