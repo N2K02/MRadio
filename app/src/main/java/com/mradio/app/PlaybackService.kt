@@ -332,14 +332,20 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
-     * Previous station, next station, the heart (only when the station isn't in Favourite Radios
-     * yet) and Exit in the notification (names are read out by TalkBack).
+     * Keep Quit between Previous and Next in the media notification.
+     * The optional Favourite action remains in the overflow menu.
      */
     private fun notificationButtons(): List<CommandButton> = listOfNotNull(
         CommandButton.Builder(CommandButton.ICON_PREVIOUS)
             .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
             .setDisplayName("Previous station")
             .setSlots(CommandButton.SLOT_BACK)
+            .build(),
+        CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(R.drawable.ic_exit)
+            .setSessionCommand(StationCommands.EXIT)
+            .setDisplayName("Quit radio")
+            .setSlots(CommandButton.SLOT_CENTRAL)
             .build(),
         CommandButton.Builder(CommandButton.ICON_NEXT)
             .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
@@ -354,12 +360,6 @@ class PlaybackService : MediaLibraryService() {
                 .setSlots(CommandButton.SLOT_OVERFLOW)
                 .build()
         },
-        CommandButton.Builder(CommandButton.ICON_UNDEFINED)
-            .setCustomIconResId(R.drawable.ic_exit)
-            .setSessionCommand(StationCommands.EXIT)
-            .setDisplayName("Quit radio")
-            .setSlots(CommandButton.SLOT_OVERFLOW)
-            .build(),
     )
 
     /** Exit: stop the radio, remove the notification, close the app screen if it is open. */
