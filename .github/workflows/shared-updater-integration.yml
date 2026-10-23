@@ -2,9 +2,9 @@ name: Shared updater integration checks
 
 on:
   push:
-    branches: [feature/shared-updater-integration]
+    branches: [experimental/consolidated-mradio]
   pull_request:
-    branches: [ui-rounded-menus, main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -22,7 +22,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
-      - name: Build and test unchanged app
+      - name: Build and test live shared updater
+        env:
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
@@ -32,7 +34,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: ${{ github.event_name != 'pull_request' || (github.actor == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -52,4 +54,4 @@ jobs:
           if [ -z "$N2K02_PACKAGES_TOKEN" ]; then echo "::error::Missing N2K02_PACKAGES_TOKEN secret"; exit 1; fi
           echo "Validating private updater dependency using configured Actions package access"
           chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest -PuseSharedUpdater=true
+          ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest -PuseSharedUpdater=true -PuseSharedTheme=true
