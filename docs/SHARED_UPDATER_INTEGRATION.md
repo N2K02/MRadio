@@ -68,3 +68,7 @@ Both shared libraries now use a single numeric release channel. The automatic `m
 **Updater blocker:** a request-connection lifecycle issue was found in the shipped `0.1.3` manifest downloader. The fix is under review in [updater PR #4](https://github.com/N2K02/n2k02updater/pull/4). Do not switch MRadio's runtime to the shared manifest loader until a corrected numeric package has been published and compiled by the private-dependency job. The next automatic release is expected to use the next workflow run number; verify the actual published version instead of assuming it.
 
 **Still required:** grant `N2K02/MRadio` read access to the private updater GitHub Package, then set the repository Actions variable `SHARED_UPDATER_VERSION` to the verified corrected release version. The default MRadio build and its current updater remain unchanged.
+
+## Manifest fix merged; corrected release in progress
+
+The HTTP connection lifecycle fix and manifest parser regression tests were merged in [n2k02updater PR #4](https://github.com/N2K02/n2k02updater/pull/4) (commit `947fc50a6bc60ad1cceb92ddbe35c9781969d63d`). The automatic publishing workflow started in [run 39934998112](https://github.com/N2K02/n2k02updater/actions/runs/39934998112), expected to produce `0.1.4` if successful. Do not set `SHARED_UPDATER_VERSION=0.1.4` until that publication succeeds. Once it does, grant MRadio read access to the private package and run the opt-in dependency CI job. Keep the legacy updater active until dependency and runtime parity are verified.
