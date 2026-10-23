@@ -74,12 +74,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
 
-    companion object {
-        /** Fail closed for update installation while radio playback is active. */
-        @Volatile var playbackActiveForUpdate: Boolean = false
-            private set
-    }
-
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaLibrarySession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -890,7 +884,11 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    private companion object {
+    companion object {
+        /** Playback-state signal for the shared updater install guard. */
+        @Volatile var playbackActiveForUpdate: Boolean = false
+            private set
+
         const val ROOT = "root"
         const val MINE = "mine"
         const val DISCOVER = "discover"
