@@ -104,3 +104,9 @@ The next migration gate is feature parity: when experimental is enabled MRadio's
 ## Runtime parity in shared updater (2026-10-23)
 
 The stable-versus-experimental newest-release behavior passed tests and merged via [updater PR #5](https://github.com/N2K02/n2k02updater/pull/5); automatic publishing for the next package is [run 39942026952](https://github.com/N2K02/n2k02updater/actions/runs/39942026952), whose result must be checked before selecting the version. The next shared-library work, [updater PR #6](https://github.com/N2K02/n2k02updater/pull/6), adds optional persisted 12-hour automatic-check throttling and skipped-release support, preserving manual checks. It is not merged or published until CI is green. Once released, the MRadio bridge can pass its existing `app_updater` preferences and switch behaviors incrementally. The existing runtime updater remains the authority until feature parity and device tests are completed.
+
+## Update-offer policy integrated (2026-10-23)
+
+The shared updater's `0.1.6` package was published successfully in [run 39943513298](https://github.com/N2K02/n2k02updater/actions/runs/39943513298). The optional adapter now injects MRadio's existing `app_updater` SharedPreferences into `UpdaterController`. This supports the library's `check(manual = false)` 12-hour policy and `skip(release)` behavior using the same preference keys as the old implementation. The private dependency is pinned to `dev.n2k02:updater:0.1.6` until Dependabot proposes and CI validates a newer release.
+
+The adapter remains compile-only and is not wired to the production UI or lifecycle. Do not switch runtime behavior before validating installation permissions, GitHub fallback, retry/error handling, and device-level updater flows.
