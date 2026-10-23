@@ -512,13 +512,6 @@ fun RadioSettings(
                                 },
                             )
                             HorizontalDivider()
-                            ListItem(
-                                headlineContent = { Text("Check for updates") },
-                                supportingContent = { Text(if (updateAvailable) "Update available — review below" else if (experimentalEnabled) "Check latest green PR build and official releases" else "Check official GitHub releases") },
-                                leadingContent = { Icon(Icons.Rounded.SystemUpdate, null) },
-                                trailingContent = { if (updateAvailable) UpdateAvailableBadge() },
-                                modifier = Modifier.clickable { onCheckUpdates() },
-                            )
                             dev.n2k02.updater.N2K02UpdateScreen(
                                 controller = LiveUpdater.controller,
                                 installGuard = LiveUpdater.installGuard,
