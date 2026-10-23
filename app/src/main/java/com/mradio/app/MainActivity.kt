@@ -50,8 +50,17 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
             else -> null
         } ?: return
-        val url = Regex("""https?://[^\\s<>\\"']+""", RegexOption.IGNORE_CASE)
-            .find(raw)?.value?.trimEnd('.', ',', ')') ?: return
+        val deepLink = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            else -> Regex("""mradio://open\\?[^\\s<>]+""", RegexOption.IGNORE_CASE)
+                .find(raw)?.value?.let(Uri::parse)
+        }
+        val streamText = if (deepLink?.scheme.equals("mradio", true) &&
+            deepLink?.host.equals("open", true)) {
+            deepLink?.getQueryParameter("url") ?: return
+        } else raw
+        val url = Regex("""https?://[^\\s<>"']+""", RegexOption.IGNORE_CASE)
+            .find(streamText)?.value?.trimEnd('.', ',', ')') ?: return
         val uri = Uri.parse(url)
         if (uri.host.isNullOrBlank() || uri.userInfo != null) return
         pendingSharedStream = url
