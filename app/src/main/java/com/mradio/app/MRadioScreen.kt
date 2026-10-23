@@ -325,8 +325,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             Library.setBrowsing(from)
             Library.remember(listOf(station))
             player.preparing = true
-            player.preparing = true
-        c.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
+            c.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
             c.prepare()
             c.play()
         }
@@ -334,6 +333,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
     fun retry(station: Station) {
         val c = controller ?: return
+        player.preparing = true
         c.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
         c.prepare()
         c.play()
