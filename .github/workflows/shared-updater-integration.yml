@@ -28,7 +28,7 @@ jobs:
           ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
   private-dependency:
-    # Enable once after granting this repo access to the private package.
+    # Enable once a read-only classic PAT is configured as N2K02_PACKAGES_TOKEN.
     permissions:
       contents: read
       packages: read
@@ -45,8 +45,8 @@ jobs:
           gradle-version: '8.14.3'
       - name: Compile against private updater package
         env:
-          N2K02_PACKAGES_USER: ${{ vars.N2K02_PACKAGES_USER || github.actor }}
-          N2K02_PACKAGES_TOKEN: ${{ github.actor == 'dependabot[bot]' && github.token || secrets.N2K02_PACKAGES_TOKEN || github.token }}
+          N2K02_PACKAGES_USER: N2K02
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
         run: |
           test -n "$N2K02_PACKAGES_USER"
           test -n "$N2K02_PACKAGES_TOKEN"
