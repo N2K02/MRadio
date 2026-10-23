@@ -84,3 +84,13 @@ The Gradle dependency uses a **literal pinned version**, `dev.n2k02:updater:0.1.
 4. Review the first Dependabot PR and require a successful private-dependency build before merging the update. Current CI excludes ordinary pull request events from accessing private credentials; its opt-in job on trusted branch pushes must be enabled, and the policy for Dependabot PR validation must be completed before updates are adopted automatically.
 
 No stable/experimental runtime migration is enabled here. The pinned `0.1.4` value is known published from successful updater publishing run 39934998112; this says nothing about the MRadio private dependency resolving until access is configured.
+
+## One-secret classic PAT setup
+
+The package username is configured as `N2K02` (public information). **Do not concatenate username and PAT in a secret**: Dependabot's Maven registry config expects separate fields, and the username itself is not sensitive.
+
+Create one secret named `N2K02_PACKAGES_TOKEN` containing only the classic PAT with `read:packages` and permission to read the private `N2K02/n2k02updater` package:
+- **Dependabot secrets**: used to authenticate Dependabot to the private Maven registry and propose dependency-update PRs.
+- **Actions secrets**: used by the opt-in shared updater integration workflow on trusted pushes. If both automatic updates and integration CI are needed, create the same named secret in **both** GitHub secret stores (GitHub does not automatically share Dependabot secrets with ordinary Actions workflows). The username secret and Actions username variable are no longer required.
+
+No secret values are committed. The integration remains opt-in with `SHARED_UPDATER_CI_ENABLED=true`, and normal builds remain unchanged.
