@@ -40,3 +40,15 @@ The token must have read access to the private package/repository. Grant access 
 
 ## Current status
 Preparation only. No runtime behavior changed. An opt-in Maven repository and dependency have been introduced, but are disabled for ordinary builds; the private package is not yet published.
+
+## Integration CI validation (2026-10-23)
+
+The feature-branch workflow `Shared updater integration checks` passed its baseline job in run [39921856850](https://github.com/N2K02/MRadio/actions/runs/39921856850). Its private-dependency job was **skipped as designed**: no published version was configured. The baseline proves default builds remain intact, **not** that the private AAR can resolve or that the new updater is wired into runtime UI.
+
+To activate the separate dependency check after a package is published:
+1. Configure repository variable `SHARED_UPDATER_VERSION` with the published version.
+2. Configure repository variable `N2K02_PACKAGES_USER` with the authorized GitHub account.
+3. Configure repository Actions secret `N2K02_PACKAGES_TOKEN` with read-only package access.
+4. Run the workflow on the integration branch and verify `private-dependency` succeeds.
+
+Do not store credentials in source or distribute them with APKs. Do not remove the legacy updater until release/experimental parity and install safety are validated on devices.
