@@ -49,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -830,6 +831,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     isMine = station.id in mine || Library.inMine(station),
                     isBroken = station.id in broken,
                     onCollapse = { playerOpen = false },
+                    onQuit = onExit,
                     onHeart = { addToMine(station) },
                     onInfo = { infoFor = station },
                     onPlayPause = { if (player.failed) retry(station) else playOrPause(station, emptyList()) },
@@ -1444,6 +1446,7 @@ private fun FullPlayer(
     isMine: Boolean,
     isBroken: Boolean,
     onCollapse: () -> Unit,
+    onQuit: () -> Unit,
     onHeart: () -> Unit,
     onInfo: () -> Unit,
     onPlayPause: () -> Unit,
@@ -1533,12 +1536,8 @@ private fun FullPlayer(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                 )
-                if (!isMine) {
-                    IconButton(onClick = onHeart) {
-                        Icon(Icons.Rounded.FavoriteBorder, contentDescription = "Add to Favourite Radios")
-                    }
-                } else {
-                    Spacer(Modifier.size(48.dp))
+                FilledTonalIconButton(onClick = onQuit) {
+                    Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Quit radio")
                 }
             }
 
