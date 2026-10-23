@@ -218,7 +218,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var confirmHideStation by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
     var settingsMenu by remember { mutableStateOf(false) }
-    val updateState by AppUpdater.state.collectAsState()
+    val updateState by LiveUpdater.controller.status.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = settingsMenu) {
@@ -535,7 +535,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     RadioBottomNavigation(
                         destination = homeTab,
                         settingsSelected = settingsMenu,
-                        updateAvailable = updateState.hasPendingUpdate(),
+                        updateAvailable = updateState.hasSharedPendingUpdate(),
                         onHome = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false },
                         onSearch = { homeTab = RadioDestination.SEARCH; settingsMenu = false },
                         onSettings = { settingsMenu = true },
@@ -549,22 +549,19 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 RadioSettings(
                     modifier = Modifier.padding(padding),
                     versionDescription = when (val u = updateState) {
-                is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
-                is AppUpdater.State.Checking -> "Checking…"
-                is AppUpdater.State.Downloading -> "Downloading…"
-                is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
-                is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
-                else -> "Installed v${AppUpdater.installedVersionName}"
+                is dev.n2k02.updater.UpdateStatus.Available -> "Update available"
+                is dev.n2k02.updater.UpdateStatus.Checking -> "Checking…"
+                is dev.n2k02.updater.UpdateStatus.Downloading -> "Downloading…"
+                is dev.n2k02.updater.UpdateStatus.Ready, is dev.n2k02.updater.UpdateStatus.NeedsInstallPermission -> "Ready to install"
+                is dev.n2k02.updater.UpdateStatus.Current -> "Up to date"
+                else -> "Installed"
             },
             onEqualizer = {
                 settingsMenu = false
                 equalizerOpen = true
             },
             onCheckUpdates = {
-                if (updateState is AppUpdater.State.Idle ||
-                    updateState is AppUpdater.State.UpToDate ||
-                    updateState is AppUpdater.State.Failed
-                ) AppUpdater.check(manual = true)
+                LiveUpdater.controller.check(manual = true)
             },
             onDismiss = { settingsMenu = false },
         )
