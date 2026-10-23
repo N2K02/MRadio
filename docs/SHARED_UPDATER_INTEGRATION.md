@@ -33,7 +33,7 @@ The shared updater is a **private Android library** while MRadio is public. The 
 Default CI and local builds **do not** resolve the private library. To test after the package is published, set `N2K02_PACKAGES_USER` and `N2K02_PACKAGES_TOKEN` in the build environment, then run:
 
 ```bash
-./gradlew :app:assembleDebug -PuseSharedUpdater=true -PsharedUpdaterVersion=0.1.0-main.2.1
+./gradlew :app:assembleDebug -PuseSharedUpdater=true 
 ```
 
 The token must have read access to the private package/repository. Grant access to the MRadio Actions repository explicitly if required by GitHub Packages. Never put the token in `gradle.properties` committed to Git or in the app manifest. The manually released stable version `0.1.0` is not verified as published. The confirmed automatic development release is `0.1.0-main.2.1`; use that version for initial CI integration.
@@ -47,7 +47,7 @@ The feature-branch workflow `Shared updater integration checks` passed its basel
 
 To activate the separate dependency check using the published development package:
 1. Under the private updater package's **Package settings → Manage Actions access**, grant `N2K02/MRadio` read access (this authorizes the built-in `GITHUB_TOKEN` from its workflow). GitHub may instead show **Manage Actions access** under package settings depending on the package UI.
-2. Set the `N2K02/MRadio` repository Actions variable `SHARED_UPDATER_VERSION` to `0.1.0-main.2.1`.
+2. Set the `N2K02/MRadio` repository Actions variable `SHARED_UPDATER_CI_ENABLED` to `0.1.0-main.2.1`.
 3. Push the integration branch or run its workflow and confirm `private-dependency` succeeds. The job now requests `packages: read` and uses `github.actor` / `github.token` by default.
 4. Only if repository-to-package Actions access cannot be granted, configure `N2K02_PACKAGES_USER` (repository variable) and `N2K02_PACKAGES_TOKEN` (Actions secret) with read-only package access. Never put this token in source or in the APK.
 
@@ -59,7 +59,7 @@ The feature branch now contains `app/src/sharedUpdater/java/com/mradio/app/Share
 
 ## Authentication hardening (2026-10-23)
 
-The opt-in `private-dependency` CI job supports GitHub's short-lived `GITHUB_TOKEN` with `packages: read`, provided the private package explicitly grants this repository Actions access. An optional custom read-only package token remains supported as a fallback. This avoids requiring a persistent PAT for the normal case. CI never runs the private-dependency job on pull-request events; it runs only on branch pushes or manual dispatch once `SHARED_UPDATER_VERSION` is set. The package has not yet been resolved in MRadio CI, so runtime migration remains blocked on that verification.
+The opt-in `private-dependency` CI job supports GitHub's short-lived `GITHUB_TOKEN` with `packages: read`, provided the private package explicitly grants this repository Actions access. An optional custom read-only package token remains supported as a fallback. This avoids requiring a persistent PAT for the normal case. CI never runs the private-dependency job on pull-request events; it runs only on branch pushes or manual dispatch once `SHARED_UPDATER_CI_ENABLED` is set. The package has not yet been resolved in MRadio CI, so runtime migration remains blocked on that verification.
 
 ## Single release channel status (2026-10-23)
 
@@ -67,8 +67,20 @@ Both shared libraries now use a single numeric release channel. The automatic `m
 
 **Updater blocker:** a request-connection lifecycle issue was found in the shipped `0.1.3` manifest downloader. The fix is under review in [updater PR #4](https://github.com/N2K02/n2k02updater/pull/4). Do not switch MRadio's runtime to the shared manifest loader until a corrected numeric package has been published and compiled by the private-dependency job. The next automatic release is expected to use the next workflow run number; verify the actual published version instead of assuming it.
 
-**Still required:** grant `N2K02/MRadio` read access to the private updater GitHub Package, then set the repository Actions variable `SHARED_UPDATER_VERSION` to the verified corrected release version. The default MRadio build and its current updater remain unchanged.
+**Still required:** grant `N2K02/MRadio` read access to the private updater GitHub Package, then set the repository Actions variable `SHARED_UPDATER_CI_ENABLED` to the verified corrected release version. The default MRadio build and its current updater remain unchanged.
 
 ## Manifest fix merged; corrected release in progress
 
 The HTTP connection lifecycle fix and manifest parser regression tests were merged in [n2k02updater PR #4](https://github.com/N2K02/n2k02updater/pull/4) (commit `947fc50a6bc60ad1cceb92ddbe35c9781969d63d`). The automatic publishing workflow started in [run 39934998112](https://github.com/N2K02/n2k02updater/actions/runs/39934998112), expected to produce `0.1.4` if successful. Do not set `SHARED_UPDATER_VERSION=0.1.4` until that publication succeeds. Once it does, grant MRadio read access to the private package and run the opt-in dependency CI job. Keep the legacy updater active until dependency and runtime parity are verified.
+
+## Automatic dependency update PRs (configured on integration branch)
+
+The Gradle dependency uses a **literal pinned version**, `dev.n2k02:updater:0.1.4`, instead of an Actions version variable. `.github/dependabot.yml` checks the private Maven registry daily and proposes pull requests when newer updater versions are available; updating this dependency does not silently replace a version in a shipped APK.
+
+**Required one-time setup:**
+1. In **MRadio → Settings → Secrets and variables → Dependabot → Secrets**, add `N2K02_PACKAGES_USER` (GitHub username for a package-authorized account) and `N2K02_PACKAGES_TOKEN` (a narrowly scoped package read token authorized for the private updater Maven package). Dependabot registry credentials are separate from Actions secrets, and they must not appear in source.
+2. Grant the MRadio Actions repository read access to the updater GitHub Package. For the existing optional integration CI check, set the MRadio Actions variable `SHARED_UPDATER_CI_ENABLED=true` **once**. The job uses the dependency version declared in Gradle, with no version variable.
+3. Dependabot processes its config from the repository's **default branch**; these changes are on the integration feature branch and **will not become active until the configuration and pinned Gradle dependency reach MRadio's default branch**. If MRadio's default branch differs from the PR base `ui-rounded-menus`, plan that transition intentionally before expecting PRs.
+4. Review the first Dependabot PR and require a successful private-dependency build before merging the update. Current CI excludes ordinary pull request events from accessing private credentials; its opt-in job on trusted branch pushes must be enabled, and the policy for Dependabot PR validation must be completed before updates are adopted automatically.
+
+No stable/experimental runtime migration is enabled here. The pinned `0.1.4` value is known published from successful updater publishing run 39934998112; this says nothing about the MRadio private dependency resolving until access is configured.
