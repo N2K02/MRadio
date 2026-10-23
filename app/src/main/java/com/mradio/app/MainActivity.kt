@@ -107,6 +107,19 @@ class MainActivity : ComponentActivity() {
             {
                 val connected = runCatching { future.get() }.getOrNull()
                 controller.value = connected
+                connected?.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        val url = previewUrl ?: return
+                        if (connected.currentMediaItem?.mediaId != "external:$url") return
+                        if (playbackState == Player.STATE_READY) {
+                            previewReady.value = url
+                            previewUrl = null
+                        } else if (playbackState == Player.STATE_IDLE) {
+                            previewError.value = true
+                            previewUrl = null
+                        }
+                    }
+                })
                 playSharedStreamIfReady()
                 if (!autoPlayedThisLaunch && Library.autoPlayPhone.value && connected != null &&
                     connected.playbackState == androidx.media3.common.Player.STATE_IDLE &&
