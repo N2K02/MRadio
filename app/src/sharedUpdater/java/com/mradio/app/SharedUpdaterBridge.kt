@@ -35,6 +35,9 @@ internal object SharedUpdaterBridge {
             offerPreferences = context.getSharedPreferences("app_updater", Context.MODE_PRIVATE),
         )
     }
+    /** Refuse to open the installer while radio playback is active. */
+    val playbackInstallGuard = UpdateInstallGuard { !PlaybackService.playbackActiveForUpdate }
+
     /** Explicit testing entry points, never invoked from the production updater. */
     fun status(controller: UpdaterController): StateFlow<UpdateStatus> = controller.status
 
