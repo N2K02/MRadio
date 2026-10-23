@@ -35,6 +35,13 @@ android {
         }
     }
 
+    // Compile the optional shared-updater adapter only in explicit integration builds.
+    sourceSets.getByName("main").java {
+        if (providers.gradleProperty("useSharedUpdater").orNull == "true") {
+            srcDir("src/sharedUpdater/java")
+        }
+    }
+
     buildFeatures {
         compose = true
     }
