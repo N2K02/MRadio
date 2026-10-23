@@ -121,3 +121,9 @@ The adapter remains compile-only and is not wired to the production UI or lifecy
 ## Updater 0.1.7 and GitHub fallback follow-up
 
 Updater `0.1.7` was published successfully in [run 39945233949](https://github.com/N2K02/n2k02updater/actions/runs/39945233949) and pinned for authenticated MRadio CI verification. A separate [draft updater PR #8](https://github.com/N2K02/n2k02updater/pull/8) proposes falling back to public GitHub Releases only when the published manifest fails with an I/O error. It is deliberately not merged: the fallback needs tests and a policy decision about releases lacking SHA-256 digests, because the verified downloader rejects missing hashes. No fallback changes are active in MRadio yet.
+
+## Published-manifest fallback delivered (2026-10-23)
+
+[Updater PR #8](https://github.com/N2K02/n2k02updater/pull/8) passed its regression tests and merged to main. The [0.1.8 package publishing run](https://github.com/N2K02/n2k02updater/actions/runs/39946560947) passed. The opt-in MRadio dependency is now pinned to `dev.n2k02:updater:0.1.8` and should pass both baseline and authenticated private-dependency CI before being considered validated.
+
+Fallback policy: use the GitHub Releases public API only when the published manifest throws an I/O failure, not when the published manifest returns no newer release. A GitHub fallback release without a valid SHA-256 digest is rejected rather than shown as installable. The live legacy updater still controls production update checks and installation. Device-level validation and UI migration remain outstanding.
