@@ -209,6 +209,7 @@ class PlaybackService : MediaLibraryService() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playbackActiveForUpdate = isPlaying
                 updateListening(isPlaying)
+                showCustomControls()
                 RadioWidgetProvider.refresh(this@PlaybackService, current?.name, isPlaying)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     TileService.requestListeningState(
@@ -373,6 +374,7 @@ class PlaybackService : MediaLibraryService() {
     /** Experimental companion notification. Android's native Media3 player stays active. */
     private fun showCustomControls() {
         if (!::player.isInitialized || player.mediaItemCount == 0) return
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel(
             customNotificationChannel, "MRadio custom controls", NotificationManager.IMPORTANCE_LOW
@@ -399,7 +401,7 @@ class PlaybackService : MediaLibraryService() {
             .setStyle(Notification.DecoratedCustomViewStyle())
             .setOngoing(true)
             .build()
-        manager.notify(customNotificationId, notification)
+        runCatching { manager.notify(customNotificationId, notification) }
     }
 
     private fun dismissCustomControls() {
