@@ -29,5 +29,14 @@ The shared updater is a **private Android library** while MRadio is public. The 
 6. Switch the settings screen behind a feature flag; keep the legacy implementation as rollback.
 7. Require successful CI and manual device tests before requesting approval to merge.
 
+## Opt-in Gradle dependency (now configured)
+Default CI and local builds **do not** resolve the private library. To test after the package is published, set `N2K02_PACKAGES_USER` and `N2K02_PACKAGES_TOKEN` in the build environment, then run:
+
+```bash
+./gradlew :app:assembleDebug -PuseSharedUpdater=true -PsharedUpdaterVersion=0.1.0
+```
+
+The token must have read access to the private package/repository. Grant access to the MRadio Actions repository explicitly if required by GitHub Packages. Never put the token in `gradle.properties` committed to Git or in the app manifest. The version above is illustrative until `0.1.0` is actually published.
+
 ## Current status
-Preparation only. No runtime behavior changed, and no dependency to the private repository has been introduced.
+Preparation only. No runtime behavior changed. An opt-in Maven repository and dependency have been introduced, but are disabled for ordinary builds; the private package is not yet published.
