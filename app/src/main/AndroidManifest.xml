@@ -38,6 +38,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Shared radio URLs from messaging apps and browsers. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" android:mimeType="audio/*" />
+                <data android:scheme="https" android:mimeType="audio/*" />
+                <data android:scheme="http" android:mimeType="application/vnd.apple.mpegurl" />
+                <data android:scheme="https" android:mimeType="application/vnd.apple.mpegurl" />
+                <data android:scheme="http" android:mimeType="audio/x-mpegurl" />
+                <data android:scheme="https" android:mimeType="audio/x-mpegurl" />
+            </intent-filter>
         </activity>
 
         <!-- Plays the radio; also the station browser and search that Android Auto shows -->
