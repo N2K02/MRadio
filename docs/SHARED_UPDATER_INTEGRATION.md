@@ -127,3 +127,9 @@ Updater `0.1.7` was published successfully in [run 39945233949](https://github.c
 [Updater PR #8](https://github.com/N2K02/n2k02updater/pull/8) passed its regression tests and merged to main. The [0.1.8 package publishing run](https://github.com/N2K02/n2k02updater/actions/runs/39946560947) passed. The opt-in MRadio dependency is now pinned to `dev.n2k02:updater:0.1.8` and should pass both baseline and authenticated private-dependency CI before being considered validated.
 
 Fallback policy: use the GitHub Releases public API only when the published manifest throws an I/O failure, not when the published manifest returns no newer release. A GitHub fallback release without a valid SHA-256 digest is rejected rather than shown as installable. The live legacy updater still controls production update checks and installation. Device-level validation and UI migration remain outstanding.
+
+## Opt-in runtime test adapter (2026-10-23)
+
+`SharedUpdaterBridge` now exposes the shared controller's `status` flow, `check(manual)`, and `skip(release)` methods. It still compiles only when `-PuseSharedUpdater=true` and has no calls from the live UI. The legacy `AppUpdater` remains the only production updater. This prepares controlled checks without adding a second updater to ordinary builds.
+
+For a future device test harness, retain the controller across activity lifecycle changes; verify automatic and manual checks, permission return, interrupted download and recovery, SHA-256 rejection, and installer launch. Do not activate a second concurrent updater or replace the legacy UI until those checks pass. Experimental legacy Actions ZIP fallback is not provided by the shared controller and remains a known parity difference.
