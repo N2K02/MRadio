@@ -7,6 +7,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.media3.common.Player
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +26,9 @@ class MainActivity : ComponentActivity() {
     private val controller = mutableStateOf<MediaController?>(null)
     private var autoPlayedThisLaunch = false
     private var pendingSharedStream: String? = null
+    private var previewUrl: String? = null
+    private val previewReady = mutableStateOf<String?>(null)
+    private val previewError = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +78,9 @@ class MainActivity : ComponentActivity() {
         val player = controller.value ?: return
         val url = pendingSharedStream ?: return
         pendingSharedStream = null
+        previewUrl = url
+        previewReady.value = null
+        previewError.value = false
         autoPlayedThisLaunch = true
         player.setMediaItem(MediaItem.Builder().setMediaId("external:$url").build())
         player.prepare()
