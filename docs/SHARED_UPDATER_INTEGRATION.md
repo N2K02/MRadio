@@ -94,3 +94,9 @@ Create one secret named `N2K02_PACKAGES_TOKEN` containing only the classic PAT w
 - **Actions secrets**: used by the opt-in shared updater integration workflow on trusted pushes. If both automatic updates and integration CI are needed, create the same named secret in **both** GitHub secret stores (GitHub does not automatically share Dependabot secrets with ordinary Actions workflows). The username secret and Actions username variable are no longer required.
 
 No secret values are committed. The integration remains opt-in with `SHARED_UPDATER_CI_ENABLED=true`, and normal builds remain unchanged.
+
+## Private updater dependency verified (2026-10-23)
+
+The trusted branch workflow [run 39939270208, attempt 3](https://github.com/N2K02/MRadio/actions/runs/39939270208) completed successfully: both `baseline` and `private-dependency` passed. The private job built `:app:assembleDebug -PuseSharedUpdater=true` against the published `dev.n2k02:updater:0.1.4` package, with the classic PAT supplied through Actions secrets. This verifies private Maven resolution and Kotlin/Android compilation, **not** runtime behavior on a device. Future private-dependency builds additionally run `:app:testDebugUnitTest`, and Dependabot PR checks are limited to PRs originating in this repository.
+
+The next migration gate is feature parity: when experimental is enabled MRadio's legacy updater compares stable and experimental candidates; the shared source currently selects only one channel. Skip-version, 12-hour throttling, GitHub fallback, diagnostics, and installation permission flows also require matching integration before enabling the new implementation. Keep PR #10 in draft until those behaviors are tested. Dependabot will become active when its configuration reaches the default branch.
