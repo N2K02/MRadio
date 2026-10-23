@@ -46,13 +46,17 @@ The private library now publishes development packages automatically from `main`
 The feature-branch workflow `Shared updater integration checks` passed its baseline job in run [39921856850](https://github.com/N2K02/MRadio/actions/runs/39921856850). Its private-dependency job was **skipped as designed**: no published version was configured. The baseline proves default builds remain intact, **not** that the private AAR can resolve or that the new updater is wired into runtime UI.
 
 To activate the separate dependency check using the published development package:
-1. Configure repository variable `SHARED_UPDATER_VERSION` with `0.1.0-main.2.1`.
-2. Configure repository variable `N2K02_PACKAGES_USER` with the authorized GitHub account.
-3. Configure repository Actions secret `N2K02_PACKAGES_TOKEN` with read-only package access.
-4. Run the workflow on the integration branch and verify `private-dependency` succeeds.
+1. Under the private updater package's **Package settings → Manage Actions access**, grant `N2K02/MRadio` read access (this authorizes the built-in `GITHUB_TOKEN` from its workflow). GitHub may instead show **Manage Actions access** under package settings depending on the package UI.
+2. Set the `N2K02/MRadio` repository Actions variable `SHARED_UPDATER_VERSION` to `0.1.0-main.2.1`.
+3. Push the integration branch or run its workflow and confirm `private-dependency` succeeds. The job now requests `packages: read` and uses `github.actor` / `github.token` by default.
+4. Only if repository-to-package Actions access cannot be granted, configure `N2K02_PACKAGES_USER` (repository variable) and `N2K02_PACKAGES_TOKEN` (Actions secret) with read-only package access. Never put this token in source or in the APK.
 
 Do not store credentials in source or distribute them with APKs. Do not remove the legacy updater until release/experimental parity and install safety are validated on devices.
 
 ## Compile-time adapter (opt-in only)
 
 The feature branch now contains `app/src/sharedUpdater/java/com/mradio/app/SharedUpdaterBridge.kt`. Gradle compiles this source only when `-PuseSharedUpdater=true` is set. It constructs the shared updater controller with MRadio's release repository, package identity, installed version code, and stable/experimental manifest settings. This is a **dependency compatibility probe**, not a production feature switch: no settings UI, update scheduling, or installer call has been redirected to it. CI must resolve the private package successfully before calling this integration verified.
+
+## Authentication hardening (2026-10-23)
+
+The opt-in `private-dependency` CI job supports GitHub's short-lived `GITHUB_TOKEN` with `packages: read`, provided the private package explicitly grants this repository Actions access. An optional custom read-only package token remains supported as a fallback. This avoids requiring a persistent PAT for the normal case. CI never runs the private-dependency job on pull-request events; it runs only on branch pushes or manual dispatch once `SHARED_UPDATER_VERSION` is set. The package has not yet been resolved in MRadio CI, so runtime migration remains blocked on that verification.
