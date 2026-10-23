@@ -18,3 +18,12 @@ internal fun AppUpdater.State.hasPendingUpdate(): Boolean = when (this) {
 internal fun UpdateAvailableBadge() {
     Badge { Text("New") }
 }
+
+/** Pending indicator for the live shared updater state. */
+internal fun dev.n2k02.updater.UpdateStatus.hasSharedPendingUpdate(): Boolean = when (this) {
+    is dev.n2k02.updater.UpdateStatus.Available,
+    is dev.n2k02.updater.UpdateStatus.Downloading,
+    is dev.n2k02.updater.UpdateStatus.Ready,
+    is dev.n2k02.updater.UpdateStatus.NeedsInstallPermission -> true
+    else -> false
+}

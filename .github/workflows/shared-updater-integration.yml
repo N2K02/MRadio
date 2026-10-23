@@ -1,0 +1,57 @@
+name: Shared updater integration checks
+
+on:
+  push:
+    branches: [experimental/consolidated-mradio]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Build and test live shared updater
+        env:
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
+
+  private-dependency:
+    # Run on trusted pushes or Dependabot PRs; never expose credentials to arbitrary PRs.
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Compile against private updater package
+        env:
+          N2K02_PACKAGES_USER: N2K02
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
+        run: |
+          test -n "$N2K02_PACKAGES_USER"
+          if [ -z "$N2K02_PACKAGES_TOKEN" ]; then echo "::error::Missing N2K02_PACKAGES_TOKEN secret"; exit 1; fi
+          echo "Validating private updater dependency using configured Actions package access"
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest -PuseSharedUpdater=true -PuseSharedTheme=true

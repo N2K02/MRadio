@@ -49,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -157,6 +158,7 @@ class PlayerUi {
     var isPlaying by mutableStateOf(false)
     var playWhenReady by mutableStateOf(false)
     var buffering by mutableStateOf(false)
+    var preparing by mutableStateOf(false)
     var failed by mutableStateOf(false)
     var title by mutableStateOf<String?>(null)
 }
@@ -173,7 +175,8 @@ private fun rememberPlayerUi(controller: MediaController?): PlayerUi {
                 ui.mediaId = c.currentMediaItem?.mediaId
                 ui.isPlaying = c.isPlaying
                 ui.playWhenReady = c.playWhenReady
-                ui.buffering = c.playbackState == Player.STATE_BUFFERING
+                ui.buffering = c.playbackState == Player.STATE_BUFFERING || (c.playWhenReady && c.playbackState == Player.STATE_IDLE && c.currentMediaItem != null)
+                if (c.isPlaying || !c.playWhenReady || c.playerError != null) ui.preparing = false
                 ui.failed = c.playerError != null
                 ui.title = c.mediaMetadata.title?.toString()
             }
@@ -218,7 +221,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var confirmHideStation by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
     var settingsMenu by remember { mutableStateOf(false) }
-    val updateState by AppUpdater.state.collectAsState()
+    val updateState by LiveUpdater.controller.status.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = settingsMenu) {
@@ -318,10 +321,11 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     fun playOrPause(station: Station, from: List<Station>) {
         val c = controller ?: return
         if (player.mediaId == station.id && !player.failed) {
-            if (c.playWhenReady) c.pause() else c.play()
+            if (c.playWhenReady) { player.preparing = false; c.pause() } else { player.preparing = true; c.play() }
         } else {
             Library.setBrowsing(from)
             Library.remember(listOf(station))
+            player.preparing = true
             c.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
             c.prepare()
             c.play()
@@ -330,6 +334,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
 
     fun retry(station: Station) {
         val c = controller ?: return
+        player.preparing = true
         c.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
         c.prepare()
         c.play()
@@ -535,7 +540,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     RadioBottomNavigation(
                         destination = homeTab,
                         settingsSelected = settingsMenu,
-                        updateAvailable = updateState.hasPendingUpdate(),
+                        updateAvailable = updateState.hasSharedPendingUpdate(),
                         onHome = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false },
                         onSearch = { homeTab = RadioDestination.SEARCH; settingsMenu = false },
                         onSettings = { settingsMenu = true },
@@ -549,22 +554,19 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 RadioSettings(
                     modifier = Modifier.padding(padding),
                     versionDescription = when (val u = updateState) {
-                is AppUpdater.State.Available -> "Version ${u.release.versionName} available"
-                is AppUpdater.State.Checking -> "Checking…"
-                is AppUpdater.State.Downloading -> "Downloading…"
-                is AppUpdater.State.Ready, is AppUpdater.State.NeedsPermission -> "Ready to install"
-                is AppUpdater.State.UpToDate -> "Up to date · v${AppUpdater.installedVersionName}"
-                else -> "Installed v${AppUpdater.installedVersionName}"
+                is dev.n2k02.updater.UpdateStatus.Available -> "Update available"
+                is dev.n2k02.updater.UpdateStatus.Checking -> "Checking…"
+                is dev.n2k02.updater.UpdateStatus.Downloading -> "Downloading…"
+                is dev.n2k02.updater.UpdateStatus.Ready, is dev.n2k02.updater.UpdateStatus.NeedsInstallPermission -> "Ready to install"
+                is dev.n2k02.updater.UpdateStatus.Current -> "Up to date"
+                else -> "Installed"
             },
             onEqualizer = {
                 settingsMenu = false
                 equalizerOpen = true
             },
             onCheckUpdates = {
-                if (updateState is AppUpdater.State.Idle ||
-                    updateState is AppUpdater.State.UpToDate ||
-                    updateState is AppUpdater.State.Failed
-                ) AppUpdater.check(manual = true)
+                LiveUpdater.controller.check(manual = true)
             },
             onDismiss = { settingsMenu = false },
         )
@@ -635,10 +637,17 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         modifier = Modifier.size(56.dp),
                                         enabled = controller != null,
                                     ) {
-                                        Icon(
-                                            if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                            contentDescription = if (player.playWhenReady) "Pause radio" else "Play radio",
-                                        )
+                                        if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
+                                            LoadingIndicator(
+                                                modifier = Modifier.size(32.dp),
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                            )
+                                        } else {
+                                            Icon(
+                                                if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                                contentDescription = if (player.playWhenReady) "Pause radio" else "Play radio",
+                                            )
+                                        }
                                     }
                                     IconButton(onClick = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
                                         enabled = current != null) {
@@ -822,6 +831,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     isMine = station.id in mine || Library.inMine(station),
                     isBroken = station.id in broken,
                     onCollapse = { playerOpen = false },
+                    onQuit = onExit,
                     onHeart = { addToMine(station) },
                     onInfo = { infoFor = station },
                     onPlayPause = { if (player.failed) retry(station) else playOrPause(station, emptyList()) },
@@ -1398,23 +1408,25 @@ private fun NowPlayingBar(
             }
             Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                 FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
-                    Icon(
-                        when {
-                            player.failed -> Icons.Rounded.Refresh
-                            player.playWhenReady -> Icons.Rounded.Pause
-                            else -> Icons.Rounded.PlayArrow
-                        },
-                        contentDescription = when {
-                            player.failed -> "Try again"
-                            player.playWhenReady -> "Pause radio"
-                            else -> "Play radio"
-                        },
-                    )
-                }
-                if (player.buffering && player.playWhenReady) {
-                    LoadingIndicator(
-                        Modifier.size(16.dp).align(Alignment.TopEnd),
-                    )
+                    if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
+                        LoadingIndicator(
+                                                modifier = Modifier.size(32.dp),
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                            )
+                    } else {
+                        Icon(
+                            when {
+                                player.failed -> Icons.Rounded.Refresh
+                                player.playWhenReady -> Icons.Rounded.Pause
+                                else -> Icons.Rounded.PlayArrow
+                            },
+                            contentDescription = when {
+                                player.failed -> "Try again"
+                                player.playWhenReady -> "Pause radio"
+                                else -> "Play radio"
+                            },
+                        )
+                    }
                 }
             }
             IconButton(onClick = onNext) {
@@ -1434,6 +1446,7 @@ private fun FullPlayer(
     isMine: Boolean,
     isBroken: Boolean,
     onCollapse: () -> Unit,
+    onQuit: () -> Unit,
     onHeart: () -> Unit,
     onInfo: () -> Unit,
     onPlayPause: () -> Unit,
@@ -1523,12 +1536,8 @@ private fun FullPlayer(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                 )
-                if (!isMine) {
-                    IconButton(onClick = onHeart) {
-                        Icon(Icons.Rounded.FavoriteBorder, contentDescription = "Add to Favourite Radios")
-                    }
-                } else {
-                    Spacer(Modifier.size(48.dp))
+                FilledTonalIconButton(onClick = onQuit) {
+                    Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Quit radio")
                 }
             }
 
@@ -1587,22 +1596,26 @@ private fun FullPlayer(
                 }
                 Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
                     FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
-                        Icon(
-                            when {
-                                player.failed -> Icons.Rounded.Refresh
-                                player.playWhenReady -> Icons.Rounded.Pause
-                                else -> Icons.Rounded.PlayArrow
-                            },
-                            contentDescription = when {
-                                player.failed -> "Try again"
-                                player.playWhenReady -> "Pause radio"
-                                else -> "Play radio"
-                            },
-                            modifier = Modifier.size(40.dp),
-                        )
-                    }
-                    if (player.buffering && player.playWhenReady) {
-                        LoadingIndicator(Modifier.size(24.dp).align(Alignment.TopEnd))
+                        if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
+                            LoadingIndicator(
+                                modifier = Modifier.size(48.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        } else {
+                            Icon(
+                                when {
+                                    player.failed -> Icons.Rounded.Refresh
+                                    player.playWhenReady -> Icons.Rounded.Pause
+                                    else -> Icons.Rounded.PlayArrow
+                                },
+                                contentDescription = when {
+                                    player.failed -> "Try again"
+                                    player.playWhenReady -> "Pause radio"
+                                    else -> "Play radio"
+                                },
+                                modifier = Modifier.size(40.dp),
+                            )
+                        }
                     }
                 }
                 FilledTonalIconButton(onClick = onNext, modifier = Modifier.size(56.dp)) {
