@@ -1050,6 +1050,7 @@ private fun StationInfoDialog(
                         DropdownMenu(expanded = streamMenu, onDismissRequest = { streamMenu = false }) {
                             DropdownMenuItem(
                                 text = { Text("Automatic (last working)") },
+                                leadingIcon = { Icon(Icons.Rounded.Refresh, null) },
                                 onClick = {
                                     streamMenu = false
                                     selectedStream = null
@@ -1063,6 +1064,7 @@ private fun StationInfoDialog(
                                             (android.net.Uri.parse(url).host ?: "Unknown host"),
                                             maxLines = 1)
                                     },
+                                    leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
                                     onClick = {
                                         streamMenu = false
                                         selectedStream = url
