@@ -70,13 +70,9 @@ class MainActivity : ComponentActivity() {
     private fun playSharedStreamIfReady() {
         val player = controller.value ?: return
         val url = pendingSharedStream ?: return
-        val station = runCatching {
-            Library.customStations().firstOrNull { url in it.streams }
-                ?: Library.saveCustomStation(null, Uri.parse(url).host ?: "Shared stream", url, "", "MU")
-        }.getOrNull() ?: return
         pendingSharedStream = null
         autoPlayedThisLaunch = true
-        player.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
+        player.setMediaItem(MediaItem.Builder().setMediaId("external:$url").build())
         player.prepare()
         player.play()
     }
