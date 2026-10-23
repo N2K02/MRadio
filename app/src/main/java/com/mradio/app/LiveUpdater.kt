@@ -2,7 +2,6 @@ package com.mradio.app
 
 import android.app.Activity
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import dev.n2k02.updater.PublishedUpdateSource
 import dev.n2k02.updater.UpdateConfig
@@ -25,9 +24,10 @@ internal object LiveUpdater {
 
     private fun prefs() = app.getSharedPreferences("app_updater", Context.MODE_PRIVATE)
 
+    @Suppress("DEPRECATION")
     private fun versionCode(): Long {
         val info = app.packageManager.getPackageInfo(app.packageName, 0)
-        return if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+        return if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
     }
 
     private fun createController() = UpdaterController(
