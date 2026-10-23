@@ -332,7 +332,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
-     * Keep Quit between Previous and Next in the media notification.
+     * Keep media notification actions in Previous, Next, Quit order.
      * The optional Favourite action remains in the overflow menu.
      */
     private fun notificationButtons(): List<CommandButton> = listOfNotNull(
@@ -341,16 +341,16 @@ class PlaybackService : MediaLibraryService() {
             .setDisplayName("Previous station")
             .setSlots(CommandButton.SLOT_BACK)
             .build(),
-        CommandButton.Builder(CommandButton.ICON_UNDEFINED)
-            .setCustomIconResId(R.drawable.ic_exit)
-            .setSessionCommand(StationCommands.EXIT)
-            .setDisplayName("Quit radio")
-            .setSlots(CommandButton.SLOT_CENTRAL)
-            .build(),
         CommandButton.Builder(CommandButton.ICON_NEXT)
             .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
             .setDisplayName("Next station")
             .setSlots(CommandButton.SLOT_FORWARD)
+            .build(),
+        CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(R.drawable.ic_exit)
+            .setSessionCommand(StationCommands.EXIT)
+            .setDisplayName("Quit radio")
+            .setSlots(CommandButton.SLOT_OVERFLOW)
             .build(),
         current?.takeIf { !Library.inMine(it) }?.let {
             CommandButton.Builder(CommandButton.ICON_HEART_UNFILLED)
