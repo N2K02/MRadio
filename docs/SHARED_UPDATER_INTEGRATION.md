@@ -143,3 +143,9 @@ The shared updater's malformed-manifest recovery and quiet automatic-check failu
 ## Shared updater 0.1.10 validated release candidate (2026-10-23)
 
 [Publishing run 39948736206](https://github.com/N2K02/n2k02updater/actions/runs/39948736206) successfully published `dev.n2k02:updater:0.1.10` with the merged manifest parsing and automatic-check failure policies. The opt-in Gradle dependency has been bumped directly from 0.1.8 to 0.1.10. Verify baseline and authenticated `-PuseSharedUpdater=true` CI against the updated branch before device testing. Neither the live updater nor normal Gradle builds use the shared controller yet.
+
+## Isolated Compose device-test screen (2026-10-23)
+
+An optional `SharedUpdaterTestScreen` composable has been added under `app/src/sharedUpdater/java`. It is **not routed from any production screen** and compiles only with `-PuseSharedUpdater=true`. It retains a shared controller across recompositions, subscribes to lifecycle `ON_RESUME`, forwards permission-return and automatic-check handling to the bridge, removes its observer on disposal, and displays the library's `N2K02UpdateScreen`. The caller must supply an app-specific `UpdateInstallGuard` (do not use an unconditional allow guard if playback or other active operations need protection).
+
+To test on an Android device, temporarily invoke the test composable from a controlled developer-only entry point in an integration build; no entry point has been added to the shipped app. Validate stable and experimental manifest offers, skip/manual check behavior, download checksum and signature failure paths, installer permission return, lifecycle recreation, and active playback. This test screen is a compilation and device-validation harness, not evidence of completed device testing.
