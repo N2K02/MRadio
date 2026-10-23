@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -29,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -113,7 +117,21 @@ internal fun StationRow(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Rounded.MoreVert, contentDescription = "More options for ${station.name}")
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        modifier = Modifier
+                            .widthIn(min = 250.dp)
+                            .clip(RoundedCornerShape(24.dp)),
+                    ) {
+                        Text(
+                            station.name,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         DropdownMenuItem(
                             text = { Text(if (isMine) "Remove from Favorites" else "Add to Favorites") },
                             onClick = { menuOpen = false; onHeart() },
@@ -128,6 +146,7 @@ internal fun StationRow(
                                 leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
                             )
                         }
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                         DropdownMenuItem(
                             text = { Text("Share station") },
                             onClick = { menuOpen = false; onShare() },
@@ -143,6 +162,7 @@ internal fun StationRow(
                             onClick = { menuOpen = false; onCopy() },
                             leadingIcon = { Icon(Icons.Rounded.Link, null) },
                         )
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                         DropdownMenuItem(
                             text = { Text("Station details") },
                             onClick = { menuOpen = false; onInfo() },
