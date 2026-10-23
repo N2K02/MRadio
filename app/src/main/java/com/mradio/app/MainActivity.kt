@@ -1,6 +1,8 @@
 package com.mradio.app
 
 import android.content.ComponentName
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,12 +21,14 @@ class MainActivity : ComponentActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private val controller = mutableStateOf<MediaController?>(null)
     private var autoPlayedThisLaunch = false
+    private var pendingSharedStream: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppUpdater.init(this, "N2K02/MRadio", "MRadio")
         enableEdgeToEdge()
         Library.init(this)
+        receiveSharedStream(intent)
         // Exit pressed in the notification while the app is open.
         lifecycleScope.launch { AppExit.requests.collect { finishAndRemoveTask() } }
         setContent {
@@ -32,6 +36,49 @@ class MainActivity : ComponentActivity() {
                 MRadioScreen(controller = controller.value, onExit = ::exit)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        receiveSharedStream(intent)
+    }
+
+    private fun receiveSharedStream(intent: Intent?) {
+        val raw = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.dataString
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+            else -> null
+        } ?: return
+        val deepLink = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            else -> Regex("""mradio://open\\?[^\\s<>]+""", RegexOption.IGNORE_CASE)
+                .find(raw)?.value?.let(Uri::parse)
+        }
+        val streamText = if (deepLink?.scheme.equals("mradio", true) &&
+            deepLink?.host.equals("open", true)) {
+            deepLink?.getQueryParameter("url") ?: return
+        } else raw
+        val url = Regex("""https?://[^\\s<>"']+""", RegexOption.IGNORE_CASE)
+            .find(streamText)?.value?.trimEnd('.', ',', ')') ?: return
+        val uri = Uri.parse(url)
+        if (uri.host.isNullOrBlank() || uri.userInfo != null) return
+        pendingSharedStream = url
+        playSharedStreamIfReady()
+    }
+
+    private fun playSharedStreamIfReady() {
+        val player = controller.value ?: return
+        val url = pendingSharedStream ?: return
+        val station = runCatching {
+            Library.customStations().firstOrNull { url in it.streams }
+                ?: Library.saveCustomStation(null, Uri.parse(url).host ?: "Shared stream", url, "", "MU")
+        }.getOrNull() ?: return
+        pendingSharedStream = null
+        autoPlayedThisLaunch = true
+        player.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
+        player.prepare()
+        player.play()
     }
 
     /** Stop the radio and close the app. */
@@ -54,6 +101,7 @@ class MainActivity : ComponentActivity() {
             {
                 val connected = runCatching { future.get() }.getOrNull()
                 controller.value = connected
+                playSharedStreamIfReady()
                 if (!autoPlayedThisLaunch && Library.autoPlayPhone.value && connected != null &&
                     connected.playbackState == androidx.media3.common.Player.STATE_IDLE &&
                     connected.mediaItemCount == 0
