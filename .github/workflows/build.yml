@@ -190,13 +190,19 @@ jobs:
             extra=(--latest)
           fi
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::Release tag $tag already exists. Use a new version or workflow run."
-            exit 1
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              gh release upload "$tag" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --clobber
+              echo "Experimental release asset updated: $tag"
+            else
+              echo "::error::Stable release tag $tag already exists. Use a new version."
+              exit 1
+            fi
+          else
+            gh release create "$tag" "$APK_NAME.apk" \
+              --repo "$GITHUB_REPOSITORY" --target "$target" \
+              --title "$title" --notes-file release-notes.md "${extra[@]}"
+            echo "Private release created: $tag"
           fi
-          gh release create "$tag" "$APK_NAME.apk" \
-            --repo "$GITHUB_REPOSITORY" --target "$target" \
-            --title "$title" --notes-file release-notes.md "${extra[@]}"
-          echo "Private release created: $tag"
 
       - name: Check public distribution configuration
         id: distribution
