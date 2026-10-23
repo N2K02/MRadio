@@ -139,3 +139,7 @@ For a future device test harness, retain the controller across activity lifecycl
 The compile-only `SharedUpdaterBridge` now exposes `download`, `install`, `openInstallPermission`, `onResume`, and `cancel` alongside check/skip/status. Installing always requires a host-supplied `UpdateInstallGuard`; no default allow-all guard is provided. `onResume` retries a pending install permission flow or triggers a throttled automatic check when idle. The bridge is still absent from ordinary builds and has no production UI callers. Real-device validation remains mandatory.
 
 The shared updater's malformed-manifest recovery and quiet automatic-check failure changes merged in [PR #9](https://github.com/N2K02/n2k02updater/pull/9) and [PR #10](https://github.com/N2K02/n2k02updater/pull/10). Wait for the newest package to publish successfully, then bump the opt-in dependency and verify authenticated CI before any runtime rollout.
+
+## Shared updater 0.1.10 validated release candidate (2026-10-23)
+
+[Publishing run 39948736206](https://github.com/N2K02/n2k02updater/actions/runs/39948736206) successfully published `dev.n2k02:updater:0.1.10` with the merged manifest parsing and automatic-check failure policies. The opt-in Gradle dependency has been bumped directly from 0.1.8 to 0.1.10. Verify baseline and authenticated `-PuseSharedUpdater=true` CI against the updated branch before device testing. Neither the live updater nor normal Gradle builds use the shared controller yet.
