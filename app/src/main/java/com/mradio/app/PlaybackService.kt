@@ -74,6 +74,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
 
+    companion object {
+        /** Fail closed for update installation while radio playback is active. */
+        @Volatile var playbackActiveForUpdate: Boolean = false
+            private set
+    }
+
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaLibrarySession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -201,6 +207,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playbackActiveForUpdate = isPlaying
                 updateListening(isPlaying)
                 RadioWidgetProvider.refresh(this@PlaybackService, current?.name, isPlaying)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
