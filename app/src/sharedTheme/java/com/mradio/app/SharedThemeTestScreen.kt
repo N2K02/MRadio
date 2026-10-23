@@ -1,6 +1,7 @@
 package com.mradio.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
 import dev.n2k02.theme.N2K02Theme
 import dev.n2k02.theme.N2K02SettingsRow
 import dev.n2k02.theme.N2K02StatusCard
@@ -12,6 +13,7 @@ import dev.n2k02.theme.N2K02StatusCard
 @Composable
 internal fun SharedThemeTestScreen() {
     N2K02Theme {
+        Column {
         N2K02StatusCard(
             title = "MRadio theme integration",
             detail = "Shared Material 3 Expressive theme",
@@ -20,5 +22,6 @@ internal fun SharedThemeTestScreen() {
             title = "Appearance",
             description = "Shared design-system component",
         )
+        }
     }
 }
