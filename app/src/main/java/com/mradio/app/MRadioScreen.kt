@@ -157,6 +157,7 @@ class PlayerUi {
     var isPlaying by mutableStateOf(false)
     var playWhenReady by mutableStateOf(false)
     var buffering by mutableStateOf(false)
+    var preparing by mutableStateOf(false)
     var failed by mutableStateOf(false)
     var title by mutableStateOf<String?>(null)
 }
@@ -173,7 +174,8 @@ private fun rememberPlayerUi(controller: MediaController?): PlayerUi {
                 ui.mediaId = c.currentMediaItem?.mediaId
                 ui.isPlaying = c.isPlaying
                 ui.playWhenReady = c.playWhenReady
-                ui.buffering = c.playbackState == Player.STATE_BUFFERING
+                ui.buffering = c.playbackState == Player.STATE_BUFFERING || (c.playWhenReady && c.playbackState == Player.STATE_IDLE && c.currentMediaItem != null)
+                if (c.isPlaying || !c.playWhenReady || c.playerError != null) ui.preparing = false
                 ui.failed = c.playerError != null
                 ui.title = c.mediaMetadata.title?.toString()
             }
@@ -318,11 +320,13 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     fun playOrPause(station: Station, from: List<Station>) {
         val c = controller ?: return
         if (player.mediaId == station.id && !player.failed) {
-            if (c.playWhenReady) c.pause() else c.play()
+            if (c.playWhenReady) { player.preparing = false; c.pause() } else { player.preparing = true; c.play() }
         } else {
             Library.setBrowsing(from)
             Library.remember(listOf(station))
-            c.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
+            player.preparing = true
+            player.preparing = true
+        c.setMediaItem(MediaItem.Builder().setMediaId(station.id).build())
             c.prepare()
             c.play()
         }
@@ -632,10 +636,14 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         modifier = Modifier.size(56.dp),
                                         enabled = controller != null,
                                     ) {
-                                        Icon(
-                                            if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                            contentDescription = if (player.playWhenReady) "Pause radio" else "Play radio",
-                                        )
+                                        if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
+                                            LoadingIndicator(Modifier.size(32.dp))
+                                        } else {
+                                            Icon(
+                                                if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                                contentDescription = if (player.playWhenReady) "Pause radio" else "Play radio",
+                                            )
+                                        }
                                     }
                                     IconButton(onClick = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
                                         enabled = current != null) {
@@ -1395,7 +1403,7 @@ private fun NowPlayingBar(
             }
             Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                 FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
-                    if (player.buffering && player.playWhenReady) {
+                    if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
                         LoadingIndicator(Modifier.size(32.dp))
                     } else {
                         Icon(
@@ -1583,7 +1591,7 @@ private fun FullPlayer(
                 }
                 Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
                     FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
-                        if (player.buffering && player.playWhenReady) {
+                        if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
                             LoadingIndicator(Modifier.size(48.dp))
                         } else {
                             Icon(
