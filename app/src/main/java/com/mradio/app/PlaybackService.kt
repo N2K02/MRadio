@@ -1,6 +1,10 @@
 package com.mradio.app
 
 import android.app.PendingIntent
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.widget.RemoteViews
 import android.content.ComponentName
 import android.os.Build
 import android.service.quicksettings.TileService
@@ -74,6 +78,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
 
+    private val customNotificationId = 2207
+    private val customNotificationChannel = "mradio_custom_controls"
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaLibrarySession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -248,6 +254,7 @@ class PlaybackService : MediaLibraryService() {
 
     private fun refreshButtons() {
         if (::session.isInitialized) session.setMediaButtonPreferences(notificationButtons())
+        if (::player.isInitialized && player.mediaItemCount > 0) showCustomControls()
     }
 
     /** What the stream says about itself: codec, bitrate, sample rate (for the player screen). */
@@ -362,8 +369,47 @@ class PlaybackService : MediaLibraryService() {
         },
     )
 
+
+    /** Experimental companion notification. Android's native Media3 player stays active. */
+    private fun showCustomControls() {
+        if (!::player.isInitialized || player.mediaItemCount == 0) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(NotificationChannel(
+            customNotificationChannel, "MRadio custom controls", NotificationManager.IMPORTANCE_LOW
+        ))
+        fun action(name: String, code: Int): PendingIntent =
+            PendingIntent.getService(
+                this, code, Intent(this, PlaybackService::class.java).setAction(name),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        val view = RemoteViews(packageName, R.layout.notification_radio_experimental).apply {
+            setTextViewText(R.id.radio_title, "MRadio")
+            setTextViewText(R.id.radio_station, current?.name ?: "Now playing")
+            setTextViewText(R.id.radio_play_pause, if (player.isPlaying) "❚❚" else "▶")
+            setOnClickPendingIntent(R.id.radio_quit, action("com.mradio.app.NOTIF_QUIT", 207))
+            setOnClickPendingIntent(R.id.radio_previous, action("com.mradio.app.NOTIF_PREVIOUS", 208))
+            setOnClickPendingIntent(R.id.radio_play_pause, action("com.mradio.app.NOTIF_PLAY_PAUSE", 209))
+            setOnClickPendingIntent(R.id.radio_next, action("com.mradio.app.NOTIF_NEXT", 210))
+        }
+        val notification = Notification.Builder(this, customNotificationChannel)
+            .setSmallIcon(R.drawable.ic_exit)
+            .setContentTitle("MRadio")
+            .setCustomContentView(view)
+            .setCustomBigContentView(view)
+            .setStyle(Notification.DecoratedCustomViewStyle())
+            .setOngoing(true)
+            .build()
+        manager.notify(customNotificationId, notification)
+    }
+
+    private fun dismissCustomControls() {
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .cancel(customNotificationId)
+    }
+
     /** Exit: stop the radio, remove the notification, close the app screen if it is open. */
     private fun exitApp() {
+        dismissCustomControls()
         updateListening(false)
         current = null
         cancelRetry()
@@ -376,6 +422,16 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            "com.mradio.app.NOTIF_QUIT" -> { exitApp(); return START_NOT_STICKY }
+            "com.mradio.app.NOTIF_PREVIOUS" -> { switchStation(-1); showCustomControls(); return START_NOT_STICKY }
+            "com.mradio.app.NOTIF_NEXT" -> { switchStation(+1); showCustomControls(); return START_NOT_STICKY }
+            "com.mradio.app.NOTIF_PLAY_PAUSE" -> {
+                if (player.isPlaying) player.pause() else player.play()
+                showCustomControls()
+                return START_NOT_STICKY
+            }
+        }
         if (intent?.action == RadioAlarm.ACTION_PLAY_ALARM) {
             val stationId = intent.getStringExtra("stationId")
             val station = stationId?.let { Library.find(it) }
@@ -400,6 +456,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        dismissCustomControls()
         playbackActiveForUpdate = false
         updateListening(false)
         runCatching {
