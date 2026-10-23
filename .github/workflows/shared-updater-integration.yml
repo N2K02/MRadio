@@ -28,7 +28,10 @@ jobs:
           ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
   private-dependency:
-    # Explicitly opt in via repository variable after package publication.
+    # Enable with SHARED_UPDATER_VERSION after granting this repo package access.
+    permissions:
+      contents: read
+      packages: read
     if: ${{ vars.SHARED_UPDATER_VERSION != '' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
@@ -42,11 +45,12 @@ jobs:
           gradle-version: '8.14.3'
       - name: Compile against private updater package
         env:
-          N2K02_PACKAGES_USER: ${{ vars.N2K02_PACKAGES_USER }}
-          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
+          N2K02_PACKAGES_USER: ${{ vars.N2K02_PACKAGES_USER || github.actor }}
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN || github.token }}
           VERSION: ${{ vars.SHARED_UPDATER_VERSION }}
         run: |
           test -n "$N2K02_PACKAGES_USER"
           test -n "$N2K02_PACKAGES_TOKEN"
+          echo "Validating private updater dependency using configured Actions package access"
           chmod +x gradlew
           ./gradlew --no-daemon :app:assembleDebug -PuseSharedUpdater=true -PsharedUpdaterVersion="$VERSION"
