@@ -28,11 +28,11 @@ jobs:
           ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
   private-dependency:
-    # Enable once a read-only classic PAT is configured as N2K02_PACKAGES_TOKEN.
+    # Run on trusted pushes or Dependabot PRs; never expose credentials to arbitrary PRs.
     permissions:
       contents: read
       packages: read
-    if: ${{ vars.SHARED_UPDATER_CI_ENABLED == 'true' && (github.event_name != 'pull_request' || github.actor == 'dependabot[bot]') }}
+    if: ${{ github.event_name != 'pull_request' || github.actor == 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -49,7 +49,7 @@ jobs:
           N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
         run: |
           test -n "$N2K02_PACKAGES_USER"
-          test -n "$N2K02_PACKAGES_TOKEN"
+          if [ -z "$N2K02_PACKAGES_TOKEN" ]; then echo "::error::Missing N2K02_PACKAGES_TOKEN secret"; exit 1; fi
           echo "Validating private updater dependency using configured Actions package access"
           chmod +x gradlew
           ./gradlew --no-daemon :app:assembleDebug -PuseSharedUpdater=true
