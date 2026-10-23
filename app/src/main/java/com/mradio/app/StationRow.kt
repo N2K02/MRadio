@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Info
@@ -132,10 +136,12 @@ internal fun StationRow(
                         DropdownMenuItem(
                             text = { Text("Copy station information") },
                             onClick = { menuOpen = false; onCopyInfo() },
+                            leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
                         )
                         DropdownMenuItem(
                             text = { Text("Copy stream URL") },
                             onClick = { menuOpen = false; onCopy() },
+                            leadingIcon = { Icon(Icons.Rounded.Link, null) },
                         )
                         DropdownMenuItem(
                             text = { Text("Station details") },
@@ -144,9 +150,11 @@ internal fun StationRow(
                         )
                         if (inMineSection && onMoveUp != null && onMoveDown != null) {
                             DropdownMenuItem(text = { Text("Move up") },
-                                onClick = { menuOpen = false; onMoveUp() })
+                                onClick = { menuOpen = false; onMoveUp() },
+                                leadingIcon = { Icon(Icons.Rounded.KeyboardArrowUp, null) })
                             DropdownMenuItem(text = { Text("Move down") },
-                                onClick = { menuOpen = false; onMoveDown() })
+                                onClick = { menuOpen = false; onMoveDown() },
+                                leadingIcon = { Icon(Icons.Rounded.KeyboardArrowDown, null) })
                         }
                     }
                 }
