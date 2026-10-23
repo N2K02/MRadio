@@ -1,5 +1,7 @@
 package com.mradio.app
 
+import androidx.compose.ui.unit.dp
+
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
@@ -49,6 +51,7 @@ private val RadioLight = lightColorScheme(
 fun MRadioTheme(content: @Composable () -> Unit) {
     MaterialExpressiveTheme(
         colorScheme = if (isSystemInDarkTheme()) RadioDark else RadioLight,
+        shapes = androidx.compose.material3.MaterialTheme.shapes.copy(extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)),
         motionScheme = MotionScheme.expressive(),
         content = content,
     )
