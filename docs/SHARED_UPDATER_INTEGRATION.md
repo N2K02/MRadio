@@ -133,3 +133,9 @@ Fallback policy: use the GitHub Releases public API only when the published mani
 `SharedUpdaterBridge` now exposes the shared controller's `status` flow, `check(manual)`, and `skip(release)` methods. It still compiles only when `-PuseSharedUpdater=true` and has no calls from the live UI. The legacy `AppUpdater` remains the only production updater. This prepares controlled checks without adding a second updater to ordinary builds.
 
 For a future device test harness, retain the controller across activity lifecycle changes; verify automatic and manual checks, permission return, interrupted download and recovery, SHA-256 rejection, and installer launch. Do not activate a second concurrent updater or replace the legacy UI until those checks pass. Experimental legacy Actions ZIP fallback is not provided by the shared controller and remains a known parity difference.
+
+## Safe opt-in lifecycle hooks (2026-10-23)
+
+The compile-only `SharedUpdaterBridge` now exposes `download`, `install`, `openInstallPermission`, `onResume`, and `cancel` alongside check/skip/status. Installing always requires a host-supplied `UpdateInstallGuard`; no default allow-all guard is provided. `onResume` retries a pending install permission flow or triggers a throttled automatic check when idle. The bridge is still absent from ordinary builds and has no production UI callers. Real-device validation remains mandatory.
+
+The shared updater's malformed-manifest recovery and quiet automatic-check failure changes merged in [PR #9](https://github.com/N2K02/n2k02updater/pull/9) and [PR #10](https://github.com/N2K02/n2k02updater/pull/10). Wait for the newest package to publish successfully, then bump the opt-in dependency and verify authenticated CI before any runtime rollout.
