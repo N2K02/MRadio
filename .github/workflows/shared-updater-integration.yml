@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: ${{ vars.SHARED_UPDATER_CI_ENABLED == 'true' && github.event_name != 'pull_request' }}
+    if: ${{ vars.SHARED_UPDATER_CI_ENABLED == 'true' && (github.event_name != 'pull_request' || github.actor == 'dependabot[bot]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -46,7 +46,7 @@ jobs:
       - name: Compile against private updater package
         env:
           N2K02_PACKAGES_USER: ${{ vars.N2K02_PACKAGES_USER || github.actor }}
-          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN || github.token }}
+          N2K02_PACKAGES_TOKEN: ${{ github.actor == 'dependabot[bot]' && github.token || secrets.N2K02_PACKAGES_TOKEN || github.token }}
         run: |
           test -n "$N2K02_PACKAGES_USER"
           test -n "$N2K02_PACKAGES_TOKEN"
