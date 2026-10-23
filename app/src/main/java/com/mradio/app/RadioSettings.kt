@@ -3,6 +3,7 @@ package com.mradio.app
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.draw.clip
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -277,6 +278,7 @@ fun RadioSettings(
                                         androidx.compose.material3.DropdownMenu(
                                             expanded = alarmMenuOpen,
                                             onDismissRequest = { alarmMenuOpen = false },
+                                            modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp)),
                                         ) {
                                             available.forEach { station ->
                                                 androidx.compose.material3.DropdownMenuItem(
@@ -527,6 +529,7 @@ fun RadioSettings(
         }
         if (stationEditorOpen) {
             AlertDialog(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
                 onDismissRequest = { stationEditorOpen = false },
                 title = { Text(if (editingStation == null) "Add station" else "Edit station") },
                 text = {
