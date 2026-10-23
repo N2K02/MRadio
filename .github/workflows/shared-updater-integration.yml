@@ -28,11 +28,11 @@ jobs:
           ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
   private-dependency:
-    # Enable with SHARED_UPDATER_VERSION after granting this repo package access.
+    # Enable once after granting this repo access to the private package.
     permissions:
       contents: read
       packages: read
-    if: ${{ vars.SHARED_UPDATER_VERSION != '' && github.event_name != 'pull_request' }}
+    if: ${{ vars.SHARED_UPDATER_CI_ENABLED == 'true' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -47,10 +47,9 @@ jobs:
         env:
           N2K02_PACKAGES_USER: ${{ vars.N2K02_PACKAGES_USER || github.actor }}
           N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN || github.token }}
-          VERSION: ${{ vars.SHARED_UPDATER_VERSION }}
         run: |
           test -n "$N2K02_PACKAGES_USER"
           test -n "$N2K02_PACKAGES_TOKEN"
           echo "Validating private updater dependency using configured Actions package access"
           chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleDebug -PuseSharedUpdater=true -PsharedUpdaterVersion="$VERSION"
+          ./gradlew --no-daemon :app:assembleDebug -PuseSharedUpdater=true
