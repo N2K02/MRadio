@@ -23,6 +23,7 @@ internal object SharedUpdaterBridge {
             context = context,
             config = config,
             publishedSource = PublishedUpdateSource(manifestUrl),
+            offerPreferences = context.getSharedPreferences("app_updater", Context.MODE_PRIVATE),
         )
     }
 }
