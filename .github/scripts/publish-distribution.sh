@@ -67,10 +67,19 @@ if [[ -n "$OLD" ]]; then
   fi
 fi
 
-CURRENT_SHA=$(gh api "repos/$PUBLIC_REPO/contents/$PATH_IN_REPO" --jq '.sha' 2>/dev/null || true)
-ARGS=(--method PUT "repos/$PUBLIC_REPO/contents/$PATH_IN_REPO" -f "message=Publish $CHANNEL mRadio APK build $GITHUB_RUN_NUMBER" -f "content=$(base64 -w0 update-manifest.json)" -f "branch=main")
-if [[ -n "$CURRENT_SHA" ]]; then ARGS+=(-f "sha=$CURRENT_SHA"); fi
-gh api "${ARGS[@]}" >/dev/null
+for attempt in 1 2 3 4 5; do
+  CURRENT_SHA=$(gh api "repos/$PUBLIC_REPO/contents/$PATH_IN_REPO" --jq '.sha' 2>/dev/null || true)
+  ARGS=(--method PUT "repos/$PUBLIC_REPO/contents/$PATH_IN_REPO" -f "message=Publish $CHANNEL mRadio APK build $GITHUB_RUN_NUMBER" -f "content=$(base64 -w0 update-manifest.json)" -f "branch=main")
+  [ -z "$CURRENT_SHA" ] || ARGS+=(-f "sha=$CURRENT_SHA")
+  if gh api "${ARGS[@]}" >/dev/null; then
+    break
+  fi
+  if [ "$attempt" -eq 5 ]; then
+    echo "Failed to publish manifest after five attempts" >&2
+    exit 1
+  fi
+  sleep "$((attempt * 2))"
+done
 
 echo "Published $CHANNEL signed APK ($SIZE bytes) to $URL"
 echo "Updated public channel manifest: https://n2k02.github.io/$PATH_IN_REPO"
