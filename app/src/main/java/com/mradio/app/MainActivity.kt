@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MRadioTheme {
                 MRadioScreen(controller = controller.value, onExit = ::exit)
+                PreviewDialogs()
             }
         }
     }
