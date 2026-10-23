@@ -68,9 +68,9 @@ fun RadioSettings(
 ) {
     val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
-    val experimentalEnabled by AppUpdater.experimentalEnabled.collectAsState()
-    val updaterState by AppUpdater.state.collectAsState()
-    val updateAvailable = updaterState.hasPendingUpdate()
+    val experimentalEnabled by LiveUpdater.experimentalEnabled.collectAsState()
+    val updaterState by LiveUpdater.controller.status.collectAsState()
+    val updateAvailable = updaterState.hasSharedPendingUpdate()
     val playbackEvents by Library.events.collectAsState()
     val listeningStats by Library.listeningStats.collectAsState()
     val stationList by Library.stations.collectAsState()
@@ -504,11 +504,11 @@ fun RadioSettings(
                                 trailingContent = {
                                     Switch(
                                         checked = experimentalEnabled,
-                                        onCheckedChange = AppUpdater::setExperimentalEnabled,
+                                        onCheckedChange = LiveUpdater::setExperimentalEnabled,
                                     )
                                 },
                                 modifier = Modifier.clickable {
-                                    AppUpdater.setExperimentalEnabled(!experimentalEnabled)
+                                    LiveUpdater.setExperimentalEnabled(!experimentalEnabled)
                                 },
                             )
                             HorizontalDivider()
@@ -519,7 +519,9 @@ fun RadioSettings(
                                 trailingContent = { if (updateAvailable) UpdateAvailableBadge() },
                                 modifier = Modifier.clickable { onCheckUpdates() },
                             )
-                            UpdateCard(
+                            dev.n2k02.updater.N2K02UpdateScreen(
+                                controller = LiveUpdater.controller,
+                                installGuard = LiveUpdater.installGuard,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                             )
                         }
