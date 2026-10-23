@@ -1398,23 +1398,22 @@ private fun NowPlayingBar(
             }
             Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                 FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
-                    Icon(
-                        when {
-                            player.failed -> Icons.Rounded.Refresh
-                            player.playWhenReady -> Icons.Rounded.Pause
-                            else -> Icons.Rounded.PlayArrow
-                        },
-                        contentDescription = when {
-                            player.failed -> "Try again"
-                            player.playWhenReady -> "Pause radio"
-                            else -> "Play radio"
-                        },
-                    )
-                }
-                if (player.buffering && player.playWhenReady) {
-                    LoadingIndicator(
-                        Modifier.size(16.dp).align(Alignment.TopEnd),
-                    )
+                    if (player.buffering && player.playWhenReady) {
+                        LoadingIndicator(Modifier.size(32.dp))
+                    } else {
+                        Icon(
+                            when {
+                                player.failed -> Icons.Rounded.Refresh
+                                player.playWhenReady -> Icons.Rounded.Pause
+                                else -> Icons.Rounded.PlayArrow
+                            },
+                            contentDescription = when {
+                                player.failed -> "Try again"
+                                player.playWhenReady -> "Pause radio"
+                                else -> "Play radio"
+                            },
+                        )
+                    }
                 }
             }
             IconButton(onClick = onNext) {
@@ -1587,22 +1586,23 @@ private fun FullPlayer(
                 }
                 Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
                     FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
-                        Icon(
-                            when {
-                                player.failed -> Icons.Rounded.Refresh
-                                player.playWhenReady -> Icons.Rounded.Pause
-                                else -> Icons.Rounded.PlayArrow
-                            },
-                            contentDescription = when {
-                                player.failed -> "Try again"
-                                player.playWhenReady -> "Pause radio"
-                                else -> "Play radio"
-                            },
-                            modifier = Modifier.size(40.dp),
-                        )
-                    }
-                    if (player.buffering && player.playWhenReady) {
-                        LoadingIndicator(Modifier.size(24.dp).align(Alignment.TopEnd))
+                        if (player.buffering && player.playWhenReady) {
+                            LoadingIndicator(Modifier.size(48.dp))
+                        } else {
+                            Icon(
+                                when {
+                                    player.failed -> Icons.Rounded.Refresh
+                                    player.playWhenReady -> Icons.Rounded.Pause
+                                    else -> Icons.Rounded.PlayArrow
+                                },
+                                contentDescription = when {
+                                    player.failed -> "Try again"
+                                    player.playWhenReady -> "Pause radio"
+                                    else -> "Play radio"
+                                },
+                                modifier = Modifier.size(40.dp),
+                            )
+                        }
                     }
                 }
                 FilledTonalIconButton(onClick = onNext, modifier = Modifier.size(56.dp)) {
