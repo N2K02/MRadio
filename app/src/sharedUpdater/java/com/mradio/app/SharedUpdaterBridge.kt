@@ -3,7 +3,9 @@ package com.mradio.app
 import dev.n2k02.updater.PublishedUpdateSource
 import dev.n2k02.updater.UpdateConfig
 import dev.n2k02.updater.UpdaterController
+import android.app.Activity
 import android.content.Context
+import dev.n2k02.updater.UpdateInstallGuard
 import dev.n2k02.updater.UpdateRelease
 import dev.n2k02.updater.UpdateStatus
 import kotlinx.coroutines.flow.StateFlow
@@ -39,4 +41,26 @@ internal object SharedUpdaterBridge {
     fun check(controller: UpdaterController, manual: Boolean) = controller.check(manual)
 
     fun skip(controller: UpdaterController, release: UpdateRelease) = controller.skip(release)
+
+    fun download(controller: UpdaterController, release: UpdateRelease) = controller.download(release)
+
+    /**
+     * Always require an explicit host safety guard before launching Android's installer.
+     * Never bypass host playback/recording protections.
+     */
+    fun install(controller: UpdaterController, activity: Activity, guard: UpdateInstallGuard) =
+        controller.install(activity, guard)
+
+    fun openInstallPermission(controller: UpdaterController, activity: Activity) =
+        controller.openInstallPermission(activity)
+
+    fun onResume(controller: UpdaterController, activity: Activity, guard: UpdateInstallGuard) {
+        when (controller.status.value) {
+            is UpdateStatus.NeedsInstallPermission -> controller.install(activity, guard)
+            UpdateStatus.Idle -> controller.check(manual = false)
+            else -> Unit
+        }
+    }
+
+    fun cancel(controller: UpdaterController) = controller.cancel()
 }
