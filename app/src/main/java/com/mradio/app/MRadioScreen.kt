@@ -637,7 +637,10 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         enabled = controller != null,
                                     ) {
                                         if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
-                                            LoadingIndicator(Modifier.size(32.dp))
+                                            LoadingIndicator(
+                                                modifier = Modifier.size(32.dp),
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                            )
                                         } else {
                                             Icon(
                                                 if (player.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -1404,7 +1407,10 @@ private fun NowPlayingBar(
             Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                 FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(52.dp)) {
                     if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
-                        LoadingIndicator(Modifier.size(32.dp))
+                        LoadingIndicator(
+                                                modifier = Modifier.size(32.dp),
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                            )
                     } else {
                         Icon(
                             when {
@@ -1592,7 +1598,10 @@ private fun FullPlayer(
                 Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
                     FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(84.dp)) {
                         if ((player.buffering || player.preparing) && player.playWhenReady && !player.failed) {
-                            LoadingIndicator(Modifier.size(48.dp))
+                            LoadingIndicator(
+                                modifier = Modifier.size(48.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
                         } else {
                             Icon(
                                 when {
