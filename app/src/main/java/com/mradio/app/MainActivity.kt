@@ -50,8 +50,8 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
             else -> null
         } ?: return
-        val deepLink = when (intent.action) {
-            Intent.ACTION_VIEW -> intent.data
+        val deepLink = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent?.data
             else -> Regex("""mradio://open\\?[^\\s<>]+""", RegexOption.IGNORE_CASE)
                 .find(raw)?.value?.let(Uri::parse)
         }
