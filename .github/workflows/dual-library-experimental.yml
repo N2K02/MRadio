@@ -1,0 +1,29 @@
+name: Dual library experimental checks
+
+on:
+  push:
+    branches: [feature/integrate-theme-and-updater]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dual-library:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Compile both private libraries and run app tests
+        env:
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
+        run: |
+          test -n "$N2K02_PACKAGES_TOKEN" || { echo "::error::Missing N2K02_PACKAGES_TOKEN"; exit 1; }
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest -PuseSharedUpdater=true -PuseSharedTheme=true
