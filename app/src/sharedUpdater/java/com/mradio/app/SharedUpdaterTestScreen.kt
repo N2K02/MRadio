@@ -43,9 +43,6 @@ internal fun SharedUpdaterTestScreen(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && activity != null) {
-            SharedUpdaterBridge.onResume(controller, activity, installGuard)
-        }
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             SharedUpdaterBridge.cancel(controller)
