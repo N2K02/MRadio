@@ -408,8 +408,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     append(station.name)
                     if (station.tags.isNotBlank()) append(" · ").append(station.subtitle)
                     if (stream != null) {
-                        append("\nOpen in mRadio: mradio://open?url=").append(android.net.Uri.encode(stream))
-                        append("\nStream: ").append(stream)
+                        append("\n").append(stream)
+                        append("\n\nTo listen in mRadio, share this link to the mRadio app.")
                     }
                 }
                 val intent = Intent(Intent.ACTION_SEND).apply {
