@@ -407,7 +407,12 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                 val description = buildString {
                     append(station.name)
                     if (station.tags.isNotBlank()) append(" · ").append(station.subtitle)
-                    if (stream != null) append("\n").append(stream)
+                    if (stream != null) {
+                        append("
+Open in mRadio: mradio://open?url=").append(android.net.Uri.encode(stream))
+                        append("
+Stream: ").append(stream)
+                    }
                 }
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
