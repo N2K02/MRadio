@@ -445,7 +445,14 @@ class PlaybackService : MediaLibraryService() {
             return
         }
 
-        // Incoming external links are a one-shot preview, not a persistent station.\n        if (station.id.startsWith("external:")) {\n            Library.logPlayback("Unable to play shared stream · ${station.name}")\n            player.stop()\n            return\n        }\n\n        // A stream that was playing dropped (tunnel, network switch): retry it once first.
+        // Incoming external links are a one-shot preview, not a persistent station.
+        if (station.id.startsWith("external:")) {
+            Library.logPlayback("Unable to play shared stream · ${station.name}")
+            player.stop()
+            return
+        }
+
+        // A stream that was playing dropped (tunnel, network switch): retry it once first.
         if (wasPlaying) {
             wasPlaying = false
             val url = queue.getOrNull(attempt) ?: return
@@ -831,7 +838,13 @@ class PlaybackService : MediaLibraryService() {
             val request = mediaItems.firstOrNull()
             val station = when {
                 request == null -> null
-                request.mediaId.startsWith("external:") -> {\n                    val url = request.mediaId.removePrefix("external:")\n                    val uri = Uri.parse(url)\n                    if ((uri.scheme == "http" || uri.scheme == "https") && !uri.host.isNullOrBlank() && uri.userInfo == null)\n                        Station(request.mediaId, uri.host ?: "Shared stream", listOf(url)) else null\n                }\n                request.mediaId.isNotEmpty() -> resolve(request.mediaId)
+                request.mediaId.startsWith("external:") -> {
+                    val url = request.mediaId.removePrefix("external:")
+                    val uri = Uri.parse(url)
+                    if ((uri.scheme == "http" || uri.scheme == "https") && !uri.host.isNullOrBlank() && uri.userInfo == null)
+                        Station(request.mediaId, uri.host ?: "Shared stream", listOf(url)) else null
+                }
+                request.mediaId.isNotEmpty() -> resolve(request.mediaId)
                 else -> {
                     // Voice: "Play Top FM on MRadio". An empty query means "play something".
                     val query = request.requestMetadata.searchQuery.orEmpty()
@@ -843,7 +856,8 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
             // Stations found only on Streema get their link now.
-            val ready = station?.let { if (it.id.startsWith("external:")) it else Directory.withStreams(it) }\n                ?.also { if (it !== station) Library.update(it) }
+            val ready = station?.let { if (it.id.startsWith("external:")) it else Directory.withStreams(it) }
+                ?.also { if (it !== station) Library.update(it) }
             if (ready == null) mutableListOf() else mutableListOf(startStation(ready))
         }
 
