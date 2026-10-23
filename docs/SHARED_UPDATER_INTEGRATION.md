@@ -16,6 +16,10 @@ Source: private `N2K02/n2k02updater`, draft PR #1, module `updater`.
 - Never install during playback-critical operations if MRadio introduces a guard.
 - Keep existing Material 3 Expressive settings layout and existing accessibility strings until UI parity is reviewed.
 
+## Private dependency delivery decision
+
+The shared updater is a **private Android library** while MRadio is public. The safest immediate approach is to publish an authenticated Maven artifact from the private library CI and give MRadio CI a narrowly scoped read-only package credential. Configure Gradle credentials from environment variables in CI only, never in app source or APK. Do not add the dependency until the private package exists and a credential has been configured. For public fork PRs, avoid private dependency resolution or run a restricted build without access to secrets. No credential is currently configured by this document.
+
 ## Safe rollout
 1. Finish and test the shared updater library independently.
 2. Choose a secure delivery method for the private library (e.g. authenticated GitHub Packages CI access).
