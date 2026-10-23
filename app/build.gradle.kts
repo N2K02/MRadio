@@ -61,7 +61,7 @@ android {
 dependencies {
     // Off by default until the private package and CI read-only credentials are ready.
     if (providers.gradleProperty("useSharedUpdater").orNull == "true") {
-        implementation("dev.n2k02:updater:0.1.10")
+        implementation("dev.n2k02:updater:0.1.11") // Requires successful publisher run #11
     }
     if (providers.gradleProperty("useSharedTheme").orNull == "true") {
         implementation("dev.n2k02:theme:0.1.4") // Verify publishing run #4 before building
