@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppUpdater.init(this, "N2K02/MRadio", "MRadio")
+        LiveUpdater.init(this)
         enableEdgeToEdge()
         Library.init(this)
         receiveSharedStream(intent)
@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        AppUpdater.onResume(this)
+        LiveUpdater.onResume(this)
     }
 
     override fun onStart() {
