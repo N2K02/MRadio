@@ -1,0 +1,52 @@
+name: Shared updater integration checks
+
+on:
+  push:
+    branches: [feature/shared-updater-integration]
+  pull_request:
+    branches: [ui-rounded-menus]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Build and test unchanged app
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
+
+  private-dependency:
+    # Explicitly opt in via repository variable after package publication.
+    if: ${{ vars.SHARED_UPDATER_VERSION != '' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Compile against private updater package
+        env:
+          N2K02_PACKAGES_USER: ${{ vars.N2K02_PACKAGES_USER }}
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
+          VERSION: ${{ vars.SHARED_UPDATER_VERSION }}
+        run: |
+          test -n "$N2K02_PACKAGES_USER"
+          test -n "$N2K02_PACKAGES_TOKEN"
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug -PuseSharedUpdater=true -PsharedUpdaterVersion="$VERSION"
