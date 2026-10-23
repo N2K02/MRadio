@@ -46,6 +46,10 @@ android {
 }
 
 dependencies {
+    // Off by default until the private package and CI read-only credentials are ready.
+    if (providers.gradleProperty("useSharedUpdater").orNull == "true") {
+        implementation("dev.n2k02:updater:" + providers.gradleProperty("sharedUpdaterVersion").get())
+    }
     // Material 3 Expressive (MaterialExpressiveTheme, expressive shapes/motion/components)
     implementation("androidx.compose.material3:material3:1.5.0-beta01")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
