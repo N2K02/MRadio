@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.Composable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,6 +87,25 @@ class MainActivity : ComponentActivity() {
         player.setMediaItem(MediaItem.Builder().setMediaId("external:$url").build())
         player.prepare()
         player.play()
+    }
+
+    @Composable
+    private fun PreviewDialogs() {
+        val url = previewReady.value
+        if (url != null) {
+            AlertDialog(
+                onDismissRequest = { previewReady.value = null },
+                title = { Text("Stream is playing") },
+                text = { Text("Save this station?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        runCatching { Library.saveCustomStation(null, Uri.parse(url).host ?: "Shared stream", url, "", "MU") }
+                        previewReady.value = null
+                    }) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { previewReady.value = null }) { Text("Not now") } },
+            )
+        }
     }
 
     /** Stop the radio and close the app. */
