@@ -52,3 +52,7 @@ To activate the separate dependency check using the published development packag
 4. Run the workflow on the integration branch and verify `private-dependency` succeeds.
 
 Do not store credentials in source or distribute them with APKs. Do not remove the legacy updater until release/experimental parity and install safety are validated on devices.
+
+## Compile-time adapter (opt-in only)
+
+The feature branch now contains `app/src/sharedUpdater/java/com/mradio/app/SharedUpdaterBridge.kt`. Gradle compiles this source only when `-PuseSharedUpdater=true` is set. It constructs the shared updater controller with MRadio's release repository, package identity, installed version code, and stable/experimental manifest settings. This is a **dependency compatibility probe**, not a production feature switch: no settings UI, update scheduling, or installer call has been redirected to it. CI must resolve the private package successfully before calling this integration verified.
