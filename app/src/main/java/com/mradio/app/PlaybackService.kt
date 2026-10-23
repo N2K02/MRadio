@@ -400,6 +400,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        playbackActiveForUpdate = false
         updateListening(false)
         runCatching {
             (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
