@@ -91,6 +91,16 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun PreviewDialogs() {
+        if (previewError.value) {
+            AlertDialog(
+                onDismissRequest = { previewError.value = false },
+                title = { Text("Stream unavailable") },
+                text = { Text("This link could not be played and was not saved.") },
+                confirmButton = {
+                    TextButton(onClick = { previewError.value = false }) { Text("OK") }
+                },
+            )
+        }
         val url = previewReady.value
         if (url != null) {
             AlertDialog(
