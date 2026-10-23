@@ -98,6 +98,8 @@ jobs:
           cat release-notes.md
 
       - name: Verify unit tests and Android lint
+        env:
+          N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon testDebugUnitTest lintDebug || {
