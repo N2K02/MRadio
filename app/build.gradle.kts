@@ -42,6 +42,12 @@ android {
         }
     }
 
+    sourceSets.getByName("main").java {
+        if (providers.gradleProperty("useSharedTheme").orNull == "true") {
+            srcDir("src/sharedTheme/java")
+        }
+    }
+
     buildFeatures {
         compose = true
     }
