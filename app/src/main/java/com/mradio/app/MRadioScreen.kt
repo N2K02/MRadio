@@ -1047,7 +1047,11 @@ private fun StationInfoDialog(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        DropdownMenu(expanded = streamMenu, onDismissRequest = { streamMenu = false }) {
+                        DropdownMenu(
+                            expanded = streamMenu,
+                            onDismissRequest = { streamMenu = false },
+                            modifier = Modifier.clip(RoundedCornerShape(22.dp)),
+                        ) {
                             DropdownMenuItem(
                                 text = { Text("Automatic (last working)") },
                                 leadingIcon = { Icon(Icons.Rounded.Refresh, null) },
