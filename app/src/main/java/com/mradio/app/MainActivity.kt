@@ -54,26 +54,29 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun receiveSharedStream(intent: Intent?) {
-        val raw = when (intent?.action) {
-            Intent.ACTION_VIEW -> intent.dataString
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+        val incoming = intent ?: return
+        val raw = when (incoming.action) {
+            Intent.ACTION_VIEW -> incoming.dataString
+            Intent.ACTION_SEND -> incoming.getStringExtra(Intent.EXTRA_TEXT)
             else -> null
         } ?: return
-        val deepLink = when (intent?.action) {
-            Intent.ACTION_VIEW -> intent?.data
+
+        val deepLink = when (incoming.action) {
+            Intent.ACTION_VIEW -> incoming.data
             else -> StreamLinkParser.deepLinkFromSharedText(raw)?.let(Uri::parse)
         }
-        // The shared HTTPS page works as a verified App Link. Text shares can also
-        // contain that URL, so decode it before treating it as an audio stream.
-        val webLink = when (intent.action) {
-            Intent.ACTION_VIEW -> intent.data
+        val webLink = when (incoming.action) {
+            Intent.ACTION_VIEW -> incoming.data
             else -> StreamLinkParser.httpUrlFromText(raw)?.let(Uri::parse)
         }
+
         val streamText = when {
             deepLink?.scheme.equals("mradio", true) && deepLink?.host.equals("open", true) ->
-                deepLink?.getQueryParameter("url") ?: return
+                MRadioShareLinks.decodeToken(deepLink?.getQueryParameter("d"))
+                    ?: deepLink?.getQueryParameter("url") ?: return
             MRadioShareLinks.isSharePage(webLink?.toString()) ->
-                webLink?.getQueryParameter("u") ?: return
+                MRadioShareLinks.decodeToken(webLink?.getQueryParameter("d"))
+                    ?: webLink?.getQueryParameter("u") ?: return
             else -> raw
         }
         val url = StreamLinkParser.httpUrlFromText(streamText) ?: return
