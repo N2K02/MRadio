@@ -1060,7 +1060,7 @@ private fun StationInfoDialog(
                         DropdownMenu(
                             expanded = streamMenu,
                             onDismissRequest = { streamMenu = false },
-                            modifier = Modifier.clip(RoundedCornerShape(22.dp)),
+                            shape = RoundedCornerShape(22.dp),
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Automatic (last working)") },

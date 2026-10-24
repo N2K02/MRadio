@@ -120,9 +120,8 @@ internal fun StationRow(
                     DropdownMenu(
                         expanded = menuOpen,
                         onDismissRequest = { menuOpen = false },
-                        modifier = Modifier
-                            .widthIn(min = 250.dp)
-                            .clip(RoundedCornerShape(24.dp)),
+                        modifier = Modifier.widthIn(min = 250.dp),
+                        shape = RoundedCornerShape(24.dp),
                     ) {
                         Text(
                             station.name,

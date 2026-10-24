@@ -278,7 +278,7 @@ fun RadioSettings(
                                         androidx.compose.material3.DropdownMenu(
                                             expanded = alarmMenuOpen,
                                             onDismissRequest = { alarmMenuOpen = false },
-                                            modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp)),
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
                                         ) {
                                             available.forEach { station ->
                                                 androidx.compose.material3.DropdownMenuItem(
