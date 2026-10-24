@@ -42,6 +42,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import dev.n2k02.updater.hasPendingUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -70,7 +71,7 @@ fun RadioSettings(
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
     val experimentalEnabled by LiveUpdater.experimentalEnabled.collectAsState()
     val updaterState by LiveUpdater.controller.status.collectAsState()
-    val updateAvailable = dev.n2k02.updater.hasPendingUpdate(updaterState)
+    val updateAvailable = updaterState.hasPendingUpdate()
     val playbackEvents by Library.events.collectAsState()
     val listeningStats by Library.listeningStats.collectAsState()
     val stationList by Library.stations.collectAsState()
