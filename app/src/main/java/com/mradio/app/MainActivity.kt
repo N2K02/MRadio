@@ -63,10 +63,19 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_VIEW -> intent?.data
             else -> StreamLinkParser.deepLinkFromSharedText(raw)?.let(Uri::parse)
         }
-        val streamText = if (deepLink?.scheme.equals("mradio", true) &&
-            deepLink?.host.equals("open", true)) {
-            deepLink?.getQueryParameter("url") ?: return
-        } else raw
+        // The shared HTTPS page works as a verified App Link. Text shares can also
+        // contain that URL, so decode it before treating it as an audio stream.
+        val webLink = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            else -> StreamLinkParser.httpUrlFromText(raw)?.let(Uri::parse)
+        }
+        val streamText = when {
+            deepLink?.scheme.equals("mradio", true) && deepLink?.host.equals("open", true) ->
+                deepLink?.getQueryParameter("url") ?: return
+            MRadioShareLinks.isSharePage(webLink?.toString()) ->
+                webLink?.getQueryParameter("u") ?: return
+            else -> raw
+        }
         val url = StreamLinkParser.httpUrlFromText(streamText) ?: return
         val uri = Uri.parse(url)
         if (uri.host.isNullOrBlank() || uri.userInfo != null) return
