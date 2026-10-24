@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 internal fun RadioBottomNavigation(
     destination: RadioDestination,
     settingsSelected: Boolean,
-    updateAvailable: Boolean,
+    updateStatus: dev.n2k02.updater.UpdateStatus,
     onHome: () -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
@@ -50,8 +50,8 @@ internal fun RadioBottomNavigation(
             selected = settingsSelected,
             onClick = onSettings,
             icon = {
-                BadgedBox(badge = { if (updateAvailable) UpdateAvailableBadge() }) {
-                    Icon(Icons.Rounded.Settings, contentDescription = if (updateAvailable) "Settings, update available" else null)
+                dev.n2k02.updater.N2K02UpdateBadgedIcon(updateStatus) {
+                    Icon(Icons.Rounded.Settings, contentDescription = "Settings")
                 }
             },
             label = { Text("Settings") },

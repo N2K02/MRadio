@@ -18,6 +18,7 @@ internal object LiveUpdater {
 
     fun init(context: Context) {
         app = context.applicationContext
+        if (controllerInstance != null) return
         experimentalEnabled.value = prefs().getBoolean("experimentalEnabled", false)
         controllerInstance = createController()
     }
@@ -54,10 +55,6 @@ internal object LiveUpdater {
     }
 
     fun onResume(activity: Activity) {
-        when (controller.status.value) {
-            is dev.n2k02.updater.UpdateStatus.NeedsInstallPermission -> controller.install(activity, installGuard)
-            dev.n2k02.updater.UpdateStatus.Idle -> controller.check(manual = false)
-            else -> Unit
-        }
+        controller.onHostResume(activity, installGuard)
     }
 }
