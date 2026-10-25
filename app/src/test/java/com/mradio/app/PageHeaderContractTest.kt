@@ -5,30 +5,29 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Lightweight source-level regression guard for the mRadio header contract.
- * Visual layout and playback behavior still require Android UI validation.
- */
+/** Regression guard: one host-owned header aligned identically on all screens. */
 class PageHeaderContractTest {
-    private fun source(): String {
-        val relative = "com/mradio/app/RadioSettings.kt"
+    private fun source(filename: String): String {
+        val relative = "com/mradio/app/$filename"
         return listOf(File("src/main/java", relative), File("app/src/main/java", relative))
             .firstOrNull { it.isFile }?.readText()
             ?: error("Missing app UI source: $relative")
     }
 
     @Test fun pageHeaderHasLeadingIconAndRightSideAppName() {
-        val text = source()
-        assertTrue(text.contains("topBar = {"))
-        val header = text.substringAfter("topBar = {")
-            .substringBefore("} ) { padding ->")
-        assertTrue("Missing page icon in header", header.contains("Icons.Rounded.Settings"))
-        assertTrue("Missing application name in header", header.contains("Text(\"mRadio\""))
+        val host = source("MRadioScreen.kt")
+        val header = host.substringAfter("topBar = {").substringBefore("bottomBar = {")
+        assertTrue("Missing Settings page icon in the shared header", header.contains("Icons.Rounded.Settings"))
+        assertTrue("Missing Settings subpage icon", header.contains("SettingsDestination.UPDATES -> Icons.Rounded.SystemUpdate"))
+        assertTrue("Missing page label", header.contains("settingsPage.title"))
+        assertTrue("Missing launcher icon", header.contains("getApplicationIcon(ctx.packageName)"))
+        assertTrue("Missing mRadio name", header.contains("\"mRadio\""))
     }
 
-    @Test fun appTitleIsNotProvidedBySharedUpdater() {
-        val header = source().substringAfter("topBar = {")
-            .substringBefore("} ) { padding ->")
-        assertFalse("App header should not duplicate updater title", header.contains("N2K02UpdateTitle("))
+    @Test fun settingsDoNotProvideASecondAppBar() {
+        val settings = source("RadioSettings.kt")
+        assertFalse(settings.contains("topBar = {"))
+        assertFalse(settings.contains("Scaffold("))
+        assertFalse(settings.contains("N2K02UpdateTitle("))
     }
 }
