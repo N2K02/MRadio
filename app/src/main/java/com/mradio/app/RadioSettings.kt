@@ -43,7 +43,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import dev.n2k02.updater.hasPendingUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -55,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import dev.n2k02.updater.hasPendingUpdate
 
 /**
  * Dedicated settings navigation, separate from playback state.
@@ -62,12 +62,14 @@ import androidx.compose.ui.platform.LocalContext
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RadioSettings(
+internal fun RadioSettings(
     versionDescription: String,
     onEqualizer: () -> Unit,
     onCheckUpdates: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    page: SettingsDestination = SettingsDestination.MAIN,
+    onPageChange: (SettingsDestination) -> Unit = {},
 ) {
     val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
@@ -147,7 +149,6 @@ fun RadioSettings(
             }.getOrElse { "Import failed: ${it.message}" }
         }
     }
-    var page by rememberSaveable { mutableStateOf(SettingsDestination.MAIN) }
     var editingStation by remember { mutableStateOf<Station?>(null) }
     var stationEditorOpen by remember { mutableStateOf(false) }
     var stationName by remember { mutableStateOf("") }
@@ -166,57 +167,11 @@ fun RadioSettings(
     }
     // The settings content is embedded in the parent Scaffold, so bottom navigation
     // stays visible. System Back returns to the main Settings list from subsections.
-    BackHandler(enabled = page != SettingsDestination.MAIN) { page = SettingsDestination.MAIN }
+    BackHandler(enabled = page != SettingsDestination.MAIN) { onPageChange(SettingsDestination.MAIN) }
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Scaffold(
-                topBar = {
-                    // The parent screen hides its header in Settings. Keep exactly
-                    // one app bar at every navigation depth, including the main list.
-                    TopAppBar(
-                        title = {
-                            when (page) {
-                                SettingsDestination.MAIN -> Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.padding(start = 8.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Settings,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                    Text("Settings")
-                                }
-                                SettingsDestination.UPDATES -> dev.n2k02.updater.N2K02UpdateTitle()
-                                else -> Text(page.title)
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.background,
-                        ),
-                        navigationIcon = {
-                            if (page != SettingsDestination.MAIN) {
-                                IconButton(onClick = { page = SettingsDestination.MAIN }) {
-                                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Back to Settings")
-                                }
-                            }
-                        },
-                        actions = {
-                            if (page == SettingsDestination.MAIN) {
-                                dev.n2k02.updater.N2K02AppIcon(Modifier.size(28.dp))
-                                Text(
-                                    "mRadio",
-                                    modifier = Modifier.padding(start = 6.dp, end = 16.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            }
-                        },
-                    )
-                },
-            ) { padding ->
-                AnimatedContent(
+            AnimatedContent(
                     targetState = page,
-                    modifier = Modifier.padding(padding),
+                    modifier = Modifier.fillMaxSize(),
                     label = "Settings navigation",
                 ) { current ->
                     Column(
@@ -235,45 +190,45 @@ fun RadioSettings(
                                 headlineContent = { Text("Playback & audio") },
                                 supportingContent = { Text("Auto-play and equalizer") },
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.PLAYBACK },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.PLAYBACK) },
                             )
                             ListItem(
                                 headlineContent = { Text("Radio alarm") },
                                 supportingContent = { Text("Schedule a station to play at a chosen time") },
                                 leadingContent = { Icon(Icons.Rounded.Alarm, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.ALARM },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.ALARM) },
                             )
                             ListItem(
                                 headlineContent = { Text("Listening statistics") },
                                 supportingContent = { Text("Time listened and estimated Wi-Fi / mobile streaming") },
                                 leadingContent = { Icon(Icons.Rounded.BarChart, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.STATISTICS },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.STATISTICS) },
                             )
                             ListItem(
                                 headlineContent = { Text("Custom stations") },
                                 supportingContent = { Text("Add and edit your own station stream URLs") },
                                 leadingContent = { Icon(Icons.Rounded.AddCircleOutline, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.CUSTOM_STATIONS },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.CUSTOM_STATIONS) },
                             )
                             ListItem(
                                 headlineContent = { Text("Backup & restore") },
                                 supportingContent = { Text("Export or restore favorites, custom stations, and preferences") },
                                 leadingContent = { Icon(Icons.Rounded.Save, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.BACKUP },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.BACKUP) },
                             )
                             HorizontalDivider()
                             ListItem(
                                 headlineContent = { Text("Connection diagnostics") },
                                 supportingContent = { Text("Playback, buffering and stream errors") },
                                 leadingContent = { Icon(Icons.Rounded.BugReport, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.DIAGNOSTICS },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.DIAGNOSTICS) },
                             )
                             ListItem(
                                 headlineContent = { Text("About & updates") },
                                 supportingContent = { Text(if (updateAvailable) "A new update is available" else "App version and update checks") },
                                 leadingContent = { Icon(Icons.Rounded.Info, null) },
                                 trailingContent = { dev.n2k02.updater.N2K02UpdateBadge(updaterState) },
-                                modifier = Modifier.clickable { page = SettingsDestination.UPDATES },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.UPDATES) },
                             )
                         } else if (current == SettingsDestination.PLAYBACK) {
                             ListItem(
@@ -316,7 +271,7 @@ fun RadioSettings(
                                         androidx.compose.material3.DropdownMenu(
                                             expanded = alarmMenuOpen,
                                             onDismissRequest = { alarmMenuOpen = false },
-                                            modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp)),
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
                                         ) {
                                             available.forEach { station ->
                                                 androidx.compose.material3.DropdownMenuItem(
@@ -535,7 +490,6 @@ fun RadioSettings(
                         }
                     }
                 }
-            }
         }
         if (stationEditorOpen) {
             AlertDialog(

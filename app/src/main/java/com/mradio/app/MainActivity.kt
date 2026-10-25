@@ -54,22 +54,32 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun receiveSharedStream(intent: Intent?) {
-        val raw = when (intent?.action) {
-            Intent.ACTION_VIEW -> intent.dataString
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+        val incoming = intent ?: return
+        val raw = when (incoming.action) {
+            Intent.ACTION_VIEW -> incoming.dataString
+            Intent.ACTION_SEND -> incoming.getStringExtra(Intent.EXTRA_TEXT)
             else -> null
         } ?: return
-        val deepLink = when (intent?.action) {
-            Intent.ACTION_VIEW -> intent?.data
-            else -> Regex("""mradio://open\\?[^\\s<>]+""", RegexOption.IGNORE_CASE)
-                .find(raw)?.value?.let(Uri::parse)
+
+        val deepLink = when (incoming.action) {
+            Intent.ACTION_VIEW -> incoming.data
+            else -> StreamLinkParser.deepLinkFromSharedText(raw)?.let(Uri::parse)
         }
-        val streamText = if (deepLink?.scheme.equals("mradio", true) &&
-            deepLink?.host.equals("open", true)) {
-            deepLink?.getQueryParameter("url") ?: return
-        } else raw
-        val url = Regex("""https?://[^\\s<>"']+""", RegexOption.IGNORE_CASE)
-            .find(streamText)?.value?.trimEnd('.', ',', ')') ?: return
+        val webLink = when (incoming.action) {
+            Intent.ACTION_VIEW -> incoming.data
+            else -> StreamLinkParser.httpUrlFromText(raw)?.let(Uri::parse)
+        }
+
+        val streamText = when {
+            deepLink?.scheme.equals("mradio", true) && deepLink?.host.equals("open", true) ->
+                MRadioShareLinks.decodeToken(deepLink?.getQueryParameter("d"))
+                    ?: deepLink?.getQueryParameter("url") ?: return
+            MRadioShareLinks.isSharePage(webLink?.toString()) ->
+                MRadioShareLinks.decodeToken(webLink?.getQueryParameter("d"))
+                    ?: webLink?.getQueryParameter("u") ?: return
+            else -> raw
+        }
+        val url = StreamLinkParser.httpUrlFromText(streamText) ?: return
         val uri = Uri.parse(url)
         if (uri.host.isNullOrBlank() || uri.userInfo != null) return
         pendingSharedStream = url

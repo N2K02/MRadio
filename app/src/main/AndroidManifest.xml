@@ -46,6 +46,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="mradio" android:host="open" />
             </intent-filter>
+            <!-- Verified HTTPS links used in WhatsApp shares (falls back to the website). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="n2k02.github.io"
+                    android:pathPrefix="/mradio/r/" />
+            </intent-filter>
             <!-- Shared radio URLs from messaging apps and browsers. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
