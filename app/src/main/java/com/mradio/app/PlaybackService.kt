@@ -477,7 +477,10 @@ class PlaybackService : MediaLibraryService() {
     private fun startStation(station: Station): MediaItem {
         selectionEpoch++
         current = station
-        if (!station.id.startsWith("external:")) Library.recordPlayed(station)
+        // The Compose player resolves media IDs through Library.find(). A shared URL
+        // is a temporary playable station, not a persisted favourite.
+        if (station.id.startsWith("external:")) Library.remember(listOf(station))
+        else Library.recordPlayed(station)
         Library.logPlayback("Selected · ${station.name}")
         queue = Library.orderedStreams(station)
         attempt = 0
@@ -793,7 +796,9 @@ class PlaybackService : MediaLibraryService() {
                 StationCommands.PREVIOUS.customAction -> switchStation(-1)
                 StationCommands.EXIT.customAction -> exitApp()
                 StationCommands.FAVOURITE.customAction -> current?.let {
-                    Library.addToMine(it)
+                    if (it.id.startsWith("external:")) {
+                        it.streams.firstOrNull()?.let { url -> Library.saveSharedStream(url, it.name) }
+                    } else Library.addToMine(it)
                     refreshButtons()
                 }
                 StationCommands.SLEEP.customAction -> setSleepTimer(args.getInt(StationCommands.MINUTES, 0))
@@ -902,8 +907,22 @@ class PlaybackService : MediaLibraryService() {
                 request.mediaId.startsWith("external:") -> {
                     val url = request.mediaId.removePrefix("external:")
                     val uri = Uri.parse(url)
-                    if ((uri.scheme == "http" || uri.scheme == "https") && !uri.host.isNullOrBlank() && uri.userInfo == null)
-                        Station(request.mediaId, uri.host ?: "Shared stream", listOf(url)) else null
+                    if ((uri.scheme.equals("http", true) || uri.scheme.equals("https", true)) &&
+                        !uri.host.isNullOrBlank() && uri.userInfo == null
+                    ) {
+                        val known = Library.favouriteForStream(url) ?: Library.findByStreamUrl(url)
+                        val title = request.mediaMetadata.title?.toString()?.trim()
+                            ?.takeIf { it.length in 1..100 && !it.contains("://") }
+                        Station(
+                            id = request.mediaId,
+                            name = known?.name ?: title ?: uri.host ?: "Shared stream",
+                            streams = listOf(url),
+                            tags = known?.tags ?: "live stream",
+                            favicon = known?.favicon,
+                            country = known?.country ?: "WW",
+                            location = known?.location.orEmpty(),
+                        )
+                    } else null
                 }
                 request.mediaId.isNotEmpty() -> resolve(request.mediaId)
                 else -> {

@@ -202,7 +202,11 @@ private fun placeName(place: String) = if (place == Directory.WORLDWIDE) "Worldw
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
+fun MRadioScreen(
+    controller: MediaController?,
+    onExit: () -> Unit,
+    onSaveSharedStreamRequested: (String) -> Unit,
+) {
     val stations by Library.stations.collectAsState()
     val mine by Library.mine.collectAsState()
     val pinned by Library.pinned.collectAsState()
@@ -367,6 +371,16 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     fun removeFromMine(station: Station) {
         Library.removeFromMine(station.id)
         announce("${station.name} removed from Favourite Radios") { Library.addToMine(station) }
+    }
+
+    fun togglePlayerFavourite(station: Station) {
+        if (station.id.startsWith("external:")) {
+            val url = station.streams.firstOrNull() ?: return
+            val saved = Library.favouriteForStream(url)
+            if (saved != null) removeFromMine(saved)
+            else onSaveSharedStreamRequested(url)
+        } else if (Library.inMine(station)) removeFromMine(station)
+        else addToMine(station)
     }
 
     fun removeCompletely(station: Station) {
@@ -549,7 +563,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             player = player,
                             isMine = Library.inMine(current),
                             onOpen = { playerOpen = true },
-                            onHeart = { addToMine(current) },
+                            onHeart = { togglePlayerFavourite(current) },
                             onPlayPause = { if (player.failed) retry(current) else playOrPause(current, emptyList()) },
                             onPrevious = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
                             onNext = { controller?.sendCustomCommand(StationCommands.NEXT, Bundle.EMPTY) },
@@ -632,7 +646,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                         }
                                     }
                                     if (current != null) IconButton(onClick = {
-                                        if (Library.inMine(current)) removeFromMine(current) else addToMine(current)
+                                        togglePlayerFavourite(current)
                                     }) {
                                         Icon(
                                             if (Library.inMine(current)) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
@@ -853,7 +867,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                     isBroken = station.id in broken,
                     onCollapse = { playerOpen = false },
                     onQuit = onExit,
-                    onHeart = { addToMine(station) },
+                    onHeart = { togglePlayerFavourite(station) },
                     onInfo = { infoFor = station },
                     onPlayPause = { if (player.failed) retry(station) else playOrPause(station, emptyList()) },
                     onPrevious = { controller?.sendCustomCommand(StationCommands.PREVIOUS, Bundle.EMPTY) },
@@ -1478,7 +1492,9 @@ private fun FullPlayer(
     val audio by Library.audio.collectAsState()
     var detailsExpanded by rememberSaveable(station.id) { mutableStateOf(false) }
     val sleepAt by Library.sleepAt.collectAsState()
-    val info by produceState<Directory.Info?>(null, station.id) { value = Directory.info(station) }
+    val info by produceState<Directory.Info?>(null, station.id) {
+        if (!station.id.startsWith("external:")) value = Directory.info(station)
+    }
     val since = remember(station.id) { System.currentTimeMillis() }
     // Tick only while a sleep countdown exists, avoiding idle UI wake-ups.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -1557,6 +1573,12 @@ private fun FullPlayer(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                 )
+                IconButton(onClick = onHeart) {
+                    Icon(
+                        if (isMine) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        contentDescription = if (isMine) "Remove from favourites" else "Save to favourites",
+                    )
+                }
                 FilledTonalIconButton(onClick = onQuit) {
                     Icon(Icons.Rounded.PowerSettingsNew, contentDescription = "Quit radio")
                 }
@@ -1762,7 +1784,7 @@ private fun FullPlayer(
                         DetailRow(null, "Last worked", DateUtils.getRelativeTimeSpanString(it, now, DateUtils.MINUTE_IN_MILLIS).toString())
                     }
                     i?.slogan?.ifBlank { null }?.let { DetailRow(null, "Slogan", it) }
-                    if (i == null) {
+                    if (i == null && !station.id.startsWith("external:")) {
                         Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
                             LoadingIndicator(Modifier.size(36.dp))
                         }

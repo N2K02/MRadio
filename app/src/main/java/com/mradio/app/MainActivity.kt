@@ -2,13 +2,16 @@ package com.mradio.app
 
 import android.content.ComponentName
 import android.content.Intent
+import androidx.compose.foundation.layout.Column
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.media3.common.Player
@@ -16,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -27,9 +31,11 @@ class MainActivity : ComponentActivity() {
     private val controller = mutableStateOf<MediaController?>(null)
     private var autoPlayedThisLaunch = false
     private var pendingSharedStream: String? = null
+    private var pendingSharedName: String? = null
     private var previewUrl: String? = null
     private val previewReady = mutableStateOf<String?>(null)
     private val previewError = mutableStateOf(false)
+    private val previewSaveError = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +47,14 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { AppExit.requests.collect { finishAndRemoveTask() } }
         setContent {
             MRadioTheme {
-                MRadioScreen(controller = controller.value, onExit = ::exit)
+                MRadioScreen(
+                    controller = controller.value,
+                    onExit = ::exit,
+                    onSaveSharedStreamRequested = { url ->
+                        previewSaveError.value = null
+                        previewReady.value = url
+                    },
+                )
                 PreviewDialogs()
             }
         }
@@ -83,6 +96,15 @@ class MainActivity : ComponentActivity() {
         val uri = Uri.parse(url)
         if (uri.host.isNullOrBlank() || uri.userInfo != null) return
         pendingSharedStream = url
+        // Shared mRadio messages include the station name before the listening link.
+        // Do not treat arbitrary chat messages or URL-only shares as station names.
+        pendingSharedName = if (incoming.action == Intent.ACTION_SEND &&
+            raw.contains("Listen in MRadio:", ignoreCase = true)
+        ) raw.lineSequence().firstOrNull()
+            ?.substringBefore(" · ")?.trim()?.takeIf {
+                it.length in 1..100 && !it.contains("://") && it.none(Char::isISOControl)
+            }
+        else null
         playSharedStreamIfReady()
     }
 
@@ -90,11 +112,23 @@ class MainActivity : ComponentActivity() {
         val player = controller.value ?: return
         val url = pendingSharedStream ?: return
         pendingSharedStream = null
+        val sharedName = pendingSharedName
+        pendingSharedName = null
         previewUrl = url
         previewReady.value = null
+        previewSaveError.value = null
         previewError.value = false
         autoPlayedThisLaunch = true
-        player.setMediaItem(MediaItem.Builder().setMediaId("external:$url").build())
+        player.setMediaItem(
+            MediaItem.Builder()
+                .setMediaId("external:$url")
+                .apply {
+                    if (sharedName != null) setMediaMetadata(
+                        MediaMetadata.Builder().setTitle(sharedName).build()
+                    )
+                }
+                .build()
+        )
         player.prepare()
         player.play()
     }
@@ -111,21 +145,59 @@ class MainActivity : ComponentActivity() {
                 },
             )
         }
-        val url = previewReady.value
-        if (url != null) {
-            AlertDialog(
-                onDismissRequest = { previewReady.value = null },
-                title = { Text("Stream is playing") },
-                text = { Text("Save this station?") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        runCatching { Library.saveCustomStation(null, Uri.parse(url).host ?: "Shared stream", url, "", "MU") }
-                        previewReady.value = null
-                    }) { Text("Save") }
-                },
-                dismissButton = { TextButton(onClick = { previewReady.value = null }) { Text("Not now") } },
-            )
-        }
+        val url = previewReady.value ?: return
+        // Recheck at display time AND when saving: the favourites list can change
+        // while the stream is buffering or the dialog is open.
+        val favourite = Library.favouriteForStream(url)
+        val known = Library.favouriteForStream(url) ?: Library.findByStreamUrl(url)
+        val proposed = known?.name ?: Uri.parse(url).host ?: "Shared stream"
+        val name = remember(url) { mutableStateOf(proposed) }
+        AlertDialog(
+            onDismissRequest = { previewReady.value = null; previewSaveError.value = null },
+            title = {
+                Text(if (favourite != null) "Already in Favourite Radios" else "Stream is playing")
+            },
+            text = {
+                Column {
+                    Text(
+                        when {
+                            favourite != null -> "${favourite.name} is already saved. No duplicate will be created."
+                            known != null -> "Add ${known.name} to Favourite Radios?"
+                            else -> "Give this stream a name before saving it to Favourite Radios."
+                        }
+                    )
+                    if (favourite == null && known == null) {
+                        OutlinedTextField(
+                            value = name.value,
+                            onValueChange = { name.value = it.take(100) },
+                            label = { Text("Station name") },
+                            singleLine = true,
+                        )
+                    }
+                    previewSaveError.value?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                if (favourite != null) {
+                    TextButton(onClick = { previewReady.value = null }) { Text("OK") }
+                } else {
+                    TextButton(
+                        enabled = name.value.isNotBlank(),
+                        onClick = {
+                            runCatching { Library.saveSharedStream(url, name.value) }
+                                .onSuccess {
+                                    previewReady.value = null
+                                    previewSaveError.value = null
+                                }
+                                .onFailure { previewSaveError.value = it.message ?: "Unable to save this stream" }
+                        },
+                    ) { Text("Save") }
+                }
+            },
+            dismissButton = if (favourite == null) {
+                { TextButton(onClick = { previewReady.value = null; previewSaveError.value = null }) { Text("Not now") } }
+            } else null,
+        )
     }
 
     /** Stop the radio and close the app. */
