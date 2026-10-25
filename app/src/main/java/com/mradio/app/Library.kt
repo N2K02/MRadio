@@ -277,6 +277,23 @@ object Library {
     fun find(id: String): Station? = _stations.value.firstOrNull { it.id == id }
         ?: seen[id] ?: _recent.value.firstOrNull { it.id == id }
 
+    /** Match incoming streams against every URL (including alternate streams), not station names. */
+    fun findByStreamUrl(url: String): Station? = SharedStreamIdentity.match(_stations.value, url)
+
+    /** Return the saved favourite for a stream, even when it was shared under another media ID. */
+    fun favouriteForStream(url: String): Station? = SharedStreamIdentity.match(myStations(), url)
+
+    /** Never create a second station or favourite for an already-known URL. */
+    @Synchronized
+    fun saveSharedStream(url: String, name: String): Station {
+        favouriteForStream(url)?.let { return it }
+        findByStreamUrl(url)?.let { existing ->
+            addToMine(existing)
+            return existing
+        }
+        return saveCustomStation(null, name, url, "", "WW")
+    }
+
     /** Called only on station selection, not retries or automatic reconnection. */
     fun recordPlayed(station: Station) {
         val known = find(station.id) ?: station
@@ -525,7 +542,11 @@ object Library {
     }
 
     /** True if the station (or the same station under another id) is in Favourite Radios. */
-    fun inMine(station: Station): Boolean = (knownVersion(station)?.id ?: station.id) in _mine.value
+    fun inMine(station: Station): Boolean {
+        if ((knownVersion(station)?.id ?: station.id) in _mine.value) return true
+        return station.id.startsWith("external:") &&
+            station.streams.any { favouriteForStream(it) != null }
+    }
 
     /** Next/previous order: within the list the current station is in. */
     fun playOrder(currentId: String?): List<Station> {
