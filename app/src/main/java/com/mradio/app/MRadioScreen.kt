@@ -460,6 +460,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
+                // RadioSettings owns the only header for Settings and subpages.
+                if (!settingsMenu) {
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     Row(
                         modifier = Modifier.fillMaxWidth().statusBarsPadding()
@@ -513,6 +515,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             )
                         }
                     }
+                }
                 }
             },
             bottomBar = {
