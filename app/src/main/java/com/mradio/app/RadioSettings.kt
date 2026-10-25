@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,8 +51,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import dev.n2k02.updater.hasPendingUpdate
 
 /**
  * Dedicated settings navigation, separate from playback state.
@@ -167,19 +170,41 @@ fun RadioSettings(
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Scaffold(
                 topBar = {
-                    if (page != SettingsDestination.MAIN) {
-                        TopAppBar(
-                            title = { Text(page.title) },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.background,
-                            ),
-                            navigationIcon = {
+                    // One header at every Settings level; parent app bar is hidden.
+                    TopAppBar(
+                        title = {
+                            when (page) {
+                                SettingsDestination.MAIN -> Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.padding(start = 8.dp),
+                                ) {
+                                    Icon(Icons.Rounded.Settings, contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary)
+                                    Text("Settings")
+                                }
+                                SettingsDestination.UPDATES -> dev.n2k02.updater.N2K02UpdateTitle()
+                                else -> Text(page.title)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                        navigationIcon = {
+                            if (page != SettingsDestination.MAIN) {
                                 IconButton(onClick = { page = SettingsDestination.MAIN }) {
                                     Icon(Icons.Rounded.ArrowBack, contentDescription = "Back to Settings")
                                 }
-                            },
-                        )
-                    }
+                            }
+                        },
+                        actions = {
+                            if (page == SettingsDestination.MAIN) {
+                                dev.n2k02.updater.N2K02AppIcon(Modifier.size(28.dp))
+                                Text("mRadio", modifier = Modifier.padding(start = 6.dp, end = 16.dp),
+                                    style = MaterialTheme.typography.titleMedium)
+                            }
+                        },
+                    )
                 },
             ) { padding ->
                 AnimatedContent(
@@ -231,10 +256,16 @@ fun RadioSettings(
                             )
                             HorizontalDivider()
                             ListItem(
+                                headlineContent = { Text("Connection diagnostics") },
+                                supportingContent = { Text("Playback, buffering and stream errors") },
+                                leadingContent = { Icon(Icons.Rounded.BugReport, null) },
+                                modifier = Modifier.clickable { page = SettingsDestination.DIAGNOSTICS },
+                            )
+                            ListItem(
                                 headlineContent = { Text("About & updates") },
                                 supportingContent = { Text(if (updateAvailable) "A new update is available" else "App version and update checks") },
                                 leadingContent = { Icon(Icons.Rounded.Info, null) },
-                                trailingContent = { if (updateAvailable) UpdateAvailableBadge() },
+                                trailingContent = { dev.n2k02.updater.N2K02UpdateBadge(updaterState) },
                                 modifier = Modifier.clickable { page = SettingsDestination.UPDATES },
                             )
                         } else if (current == SettingsDestination.PLAYBACK) {
@@ -487,35 +518,12 @@ fun RadioSettings(
                                 }
                             }
                         } else {
-                            ListItem(
-                                headlineContent = { Text("Connection diagnostics") },
-                                supportingContent = { Text("Playback, buffering and stream errors") },
-                                leadingContent = { Icon(Icons.Rounded.BugReport, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.DIAGNOSTICS },
-                            )
-                            ListItem(
-                                headlineContent = { Text("MRadio") },
-                                supportingContent = { Text(versionDescription) },
-                                leadingContent = { Icon(Icons.Rounded.Settings, null) },
-                            )
-                            ListItem(
-                                headlineContent = { Text("Experimental updates") },
-                                supportingContent = { Text("Offer signed APKs from successful pull request builds. Test builds may have bugs.") },
-                                trailingContent = {
-                                    Switch(
-                                        checked = experimentalEnabled,
-                                        onCheckedChange = LiveUpdater::setExperimentalEnabled,
-                                    )
-                                },
-                                modifier = Modifier.clickable {
-                                    LiveUpdater.setExperimentalEnabled(!experimentalEnabled)
-                                },
-                            )
-                            HorizontalDivider()
                             dev.n2k02.updater.N2K02UpdateScreen(
                                 controller = LiveUpdater.controller,
                                 installGuard = LiveUpdater.installGuard,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                experimentalEnabled = experimentalEnabled,
+                                onExperimentalEnabledChange = LiveUpdater::setExperimentalEnabled,
                             )
                         }
                     }
