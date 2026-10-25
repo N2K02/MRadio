@@ -46,6 +46,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Close
@@ -221,10 +227,11 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
     var confirmHideStation by remember { mutableStateOf<Station?>(null) }
     var showHidden by remember { mutableStateOf(false) }
     var settingsMenu by remember { mutableStateOf(false) }
+    var settingsPage by rememberSaveable { mutableStateOf(SettingsDestination.MAIN) }
     val updateState by LiveUpdater.controller.status.collectAsState()
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
-    BackHandler(enabled = settingsMenu) {
+    BackHandler(enabled = settingsMenu && settingsPage == SettingsDestination.MAIN) {
         settingsMenu = false
         homeTab = RadioDestination.HOME
     }
@@ -460,8 +467,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
-                // Settings subpages render their own compact header.
-                if (!settingsMenu) {
+                // Same host-owned app bar on Home, Search, Settings and subpages.
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     Row(
                         modifier = Modifier.fillMaxWidth().statusBarsPadding()
@@ -476,7 +482,16 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         ) {
                             Icon(
                                 when {
-                                    settingsMenu -> Icons.Rounded.Settings
+                                    settingsMenu -> when (settingsPage) {
+                                        SettingsDestination.MAIN -> Icons.Rounded.Settings
+                                        SettingsDestination.PLAYBACK -> Icons.Rounded.GraphicEq
+                                        SettingsDestination.ALARM -> Icons.Rounded.Alarm
+                                        SettingsDestination.STATISTICS -> Icons.Rounded.BarChart
+                                        SettingsDestination.CUSTOM_STATIONS -> Icons.Rounded.AddCircleOutline
+                                        SettingsDestination.BACKUP -> Icons.Rounded.Save
+                                        SettingsDestination.UPDATES -> Icons.Rounded.SystemUpdate
+                                        SettingsDestination.DIAGNOSTICS -> Icons.Rounded.BugReport
+                                    }
                                     homeTab == RadioDestination.SEARCH -> Icons.Rounded.Search
                                     else -> Icons.Rounded.Home
                                 },
@@ -486,7 +501,7 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                             )
                             Text(
                                 when {
-                                    settingsMenu -> "Settings"
+                                    settingsMenu -> settingsPage.title
                                     homeTab == RadioDestination.SEARCH -> "Search"
                                     else -> "Home"
                                 },
@@ -516,7 +531,6 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         }
                     }
                 }
-                }
             },
             bottomBar = {
                 // Keep the bar and gesture-navigation inset opaque, so station cards never
@@ -544,9 +558,9 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                         destination = homeTab,
                         settingsSelected = settingsMenu,
                         updateStatus = updateState,
-                        onHome = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false },
-                        onSearch = { homeTab = RadioDestination.SEARCH; settingsMenu = false },
-                        onSettings = { settingsMenu = true },
+                        onHome = { homeTab = RadioDestination.HOME; query = ""; settingsMenu = false; settingsPage = SettingsDestination.MAIN },
+                        onSearch = { homeTab = RadioDestination.SEARCH; settingsMenu = false; settingsPage = SettingsDestination.MAIN },
+                        onSettings = { settingsPage = SettingsDestination.MAIN; settingsMenu = true },
                         onExit = onExit,
                     )
                 }
@@ -556,6 +570,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
             if (settingsMenu) {
                 RadioSettings(
                     modifier = Modifier.padding(padding),
+                    page = settingsPage,
+                    onPageChange = { settingsPage = it },
                     versionDescription = when (val u = updateState) {
                 is dev.n2k02.updater.UpdateStatus.Available -> "Update available"
                 is dev.n2k02.updater.UpdateStatus.Checking -> "Checking…"
