@@ -170,7 +170,7 @@ fun RadioSettings(
                 topBar = {
                     if (page != SettingsDestination.MAIN) {
                         TopAppBar(
-                            title = { Text(page.title) },
+                            title = { if (page == SettingsDestination.UPDATES) dev.n2k02.updater.N2K02UpdateTitle() else Text(page.title) },
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.background,
                             ),
@@ -494,29 +494,12 @@ fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.BugReport, null) },
                                 modifier = Modifier.clickable { page = SettingsDestination.DIAGNOSTICS },
                             )
-                            ListItem(
-                                headlineContent = { Text("MRadio") },
-                                supportingContent = { Text(versionDescription) },
-                                leadingContent = { Icon(Icons.Rounded.Settings, null) },
-                            )
-                            ListItem(
-                                headlineContent = { Text("Experimental updates") },
-                                supportingContent = { Text("Offer signed APKs from successful pull request builds. Test builds may have bugs.") },
-                                trailingContent = {
-                                    Switch(
-                                        checked = experimentalEnabled,
-                                        onCheckedChange = LiveUpdater::setExperimentalEnabled,
-                                    )
-                                },
-                                modifier = Modifier.clickable {
-                                    LiveUpdater.setExperimentalEnabled(!experimentalEnabled)
-                                },
-                            )
-                            HorizontalDivider()
                             dev.n2k02.updater.N2K02UpdateScreen(
                                 controller = LiveUpdater.controller,
                                 installGuard = LiveUpdater.installGuard,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                experimentalEnabled = experimentalEnabled,
+                                onExperimentalEnabledChange = LiveUpdater::setExperimentalEnabled,
                             )
                         }
                     }
