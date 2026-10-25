@@ -62,7 +62,7 @@ import dev.n2k02.updater.hasPendingUpdate
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RadioSettings(
+internal fun RadioSettings(
     versionDescription: String,
     onEqualizer: () -> Unit,
     onCheckUpdates: () -> Unit,
