@@ -543,9 +543,11 @@ object Library {
 
     /** True if the station (or the same station under another id) is in Favourite Radios. */
     fun inMine(station: Station): Boolean {
-        if ((knownVersion(station)?.id ?: station.id) in _mine.value) return true
-        return station.id.startsWith("external:") &&
-            station.streams.any { favouriteForStream(it) != null }
+        // Names can collide; an incoming stream must be identified by its URL only.
+        if (station.id.startsWith("external:")) {
+            return station.streams.any { favouriteForStream(it) != null }
+        }
+        return (knownVersion(station)?.id ?: station.id) in _mine.value
     }
 
     /** Next/previous order: within the list the current station is in. */
