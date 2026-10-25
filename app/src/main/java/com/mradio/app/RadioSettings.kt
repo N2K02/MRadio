@@ -232,6 +232,12 @@ fun RadioSettings(
                             )
                             HorizontalDivider()
                             ListItem(
+                                headlineContent = { Text("Connection diagnostics") },
+                                supportingContent = { Text("Playback, buffering and stream errors") },
+                                leadingContent = { Icon(Icons.Rounded.BugReport, null) },
+                                modifier = Modifier.clickable { page = SettingsDestination.DIAGNOSTICS },
+                            )
+                            ListItem(
                                 headlineContent = { Text("About & updates") },
                                 supportingContent = { Text(if (updateAvailable) "A new update is available" else "App version and update checks") },
                                 leadingContent = { Icon(Icons.Rounded.Info, null) },
@@ -488,12 +494,6 @@ fun RadioSettings(
                                 }
                             }
                         } else {
-                            ListItem(
-                                headlineContent = { Text("Connection diagnostics") },
-                                supportingContent = { Text("Playback, buffering and stream errors") },
-                                leadingContent = { Icon(Icons.Rounded.BugReport, null) },
-                                modifier = Modifier.clickable { page = SettingsDestination.DIAGNOSTICS },
-                            )
                             dev.n2k02.updater.N2K02UpdateScreen(
                                 controller = LiveUpdater.controller,
                                 installGuard = LiveUpdater.installGuard,
