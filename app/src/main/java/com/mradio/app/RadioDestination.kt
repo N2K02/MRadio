@@ -25,6 +25,6 @@ internal enum class SettingsDestination {
         CUSTOM_STATIONS -> "Custom stations"
         BACKUP -> "Backup & restore"
         UPDATES -> "About & updates"
-        DIAGNOSTICS -> "Diagnostics"
+        DIAGNOSTICS -> "Connection diagnostics"
     }
 }
