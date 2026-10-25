@@ -73,7 +73,7 @@ fun RadioSettings(
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
     val experimentalEnabled by LiveUpdater.experimentalEnabled.collectAsState()
     val updaterState by LiveUpdater.controller.status.collectAsState()
-    val updateAvailable = updaterState.hasSharedPendingUpdate()
+    val updateAvailable = updaterState.hasPendingUpdate()
     val playbackEvents by Library.events.collectAsState()
     val listeningStats by Library.listeningStats.collectAsState()
     val stationList by Library.stations.collectAsState()
