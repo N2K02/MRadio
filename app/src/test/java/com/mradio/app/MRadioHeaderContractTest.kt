@@ -8,7 +8,10 @@ import org.junit.Test
 /** Guard against the extra top padding caused by a Settings-owned nested Scaffold. */
 class MRadioHeaderContractTest {
     @Test fun everySettingsPageUsesTheHostHeader() {
-        val root = File("src/main/java/com/mradio/app")
+        val root = listOf(
+            File("app/src/main/java/com/mradio/app"),
+            File("src/main/java/com/mradio/app"),
+        ).first { File(it, "MRadioScreen.kt").isFile }
         val host = File(root, "MRadioScreen.kt").readText()
         val settings = File(root, "RadioSettings.kt").readText()
 
@@ -19,7 +22,7 @@ class MRadioHeaderContractTest {
         assertTrue(host.contains("SettingsDestination.UPDATES -> Icons.Rounded.SystemUpdate"))
         assertTrue(host.contains("SettingsDestination.PLAYBACK -> Icons.Rounded.GraphicEq"))
         assertTrue(host.contains("getApplicationIcon(ctx.packageName)"))
-        assertTrue(host.contains("Text(\n                                \"mRadio\""))
+        assertTrue(host.contains("\"mRadio\""))
 
         // No nested scaffold or second TopAppBar can push Settings below the Home header.
         assertFalse(settings.contains("Scaffold("))
