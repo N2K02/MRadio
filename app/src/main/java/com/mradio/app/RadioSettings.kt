@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 
@@ -168,19 +170,48 @@ fun RadioSettings(
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Scaffold(
                 topBar = {
-                    if (page != SettingsDestination.MAIN) {
-                        TopAppBar(
-                            title = { if (page == SettingsDestination.UPDATES) dev.n2k02.updater.N2K02UpdateTitle() else Text(page.title) },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.background,
-                            ),
-                            navigationIcon = {
+                    // The parent screen hides its header in Settings. Keep exactly
+                    // one app bar at every navigation depth, including the main list.
+                    TopAppBar(
+                        title = {
+                            when (page) {
+                                SettingsDestination.MAIN -> Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.padding(start = 8.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Settings,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Text("Settings")
+                                }
+                                SettingsDestination.UPDATES -> dev.n2k02.updater.N2K02UpdateTitle()
+                                else -> Text(page.title)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                        navigationIcon = {
+                            if (page != SettingsDestination.MAIN) {
                                 IconButton(onClick = { page = SettingsDestination.MAIN }) {
                                     Icon(Icons.Rounded.ArrowBack, contentDescription = "Back to Settings")
                                 }
-                            },
-                        )
-                    }
+                            }
+                        },
+                        actions = {
+                            if (page == SettingsDestination.MAIN) {
+                                dev.n2k02.updater.N2K02AppIcon(Modifier.size(28.dp))
+                                Text(
+                                    "mRadio",
+                                    modifier = Modifier.padding(start = 6.dp, end = 16.dp),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+                        },
+                    )
                 },
             ) { padding ->
                 AnimatedContent(
