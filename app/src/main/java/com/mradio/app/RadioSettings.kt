@@ -172,36 +172,36 @@ fun RadioSettings(
                 topBar = {
                     TopAppBar(
                         title = {
-                            when (page) {
-                                SettingsDestination.MAIN -> Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.padding(start = 8.dp),
-                                ) {
-                                    Icon(Icons.Rounded.Settings, contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary)
-                                    Text("Settings")
-                                }
-                                SettingsDestination.UPDATES -> dev.n2k02.updater.N2K02UpdateTitle()
-                                else -> Text(page.title)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.padding(start = 8.dp),
+                            ) {
+                                Icon(
+                                    when (page) {
+                                        SettingsDestination.MAIN -> Icons.Rounded.Settings
+                                        SettingsDestination.PLAYBACK -> Icons.Rounded.GraphicEq
+                                        SettingsDestination.ALARM -> Icons.Rounded.Alarm
+                                        SettingsDestination.STATISTICS -> Icons.Rounded.BarChart
+                                        SettingsDestination.CUSTOM_STATIONS -> Icons.Rounded.AddCircleOutline
+                                        SettingsDestination.BACKUP -> Icons.Rounded.Save
+                                        SettingsDestination.UPDATES -> Icons.Rounded.SystemUpdate
+                                        SettingsDestination.DIAGNOSTICS -> Icons.Rounded.BugReport
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                                Text(page.title, maxLines = 1)
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                         ),
-                        navigationIcon = {
-                            if (page != SettingsDestination.MAIN) {
-                                IconButton(onClick = { page = SettingsDestination.MAIN }) {
-                                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Back to Settings")
-                                }
-                            }
-                        },
                         actions = {
-                            if (page == SettingsDestination.MAIN) {
-                                dev.n2k02.updater.N2K02AppIcon(Modifier.size(28.dp))
-                                Text("mRadio", modifier = Modifier.padding(start = 6.dp, end = 16.dp),
-                                    style = MaterialTheme.typography.titleMedium)
-                            }
+                            dev.n2k02.updater.N2K02AppIcon(Modifier.size(28.dp))
+                            Text("mRadio", modifier = Modifier.padding(start = 6.dp, end = 16.dp),
+                                style = MaterialTheme.typography.titleMedium)
                         },
                     )
                 },
