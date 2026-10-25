@@ -507,6 +507,8 @@ fun MRadioScreen(controller: MediaController?, onExit: () -> Unit) {
                                 },
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         Row(
