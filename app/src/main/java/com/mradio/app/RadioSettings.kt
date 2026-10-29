@@ -176,7 +176,6 @@ internal fun RadioSettings(
                     if (current == SettingsDestination.LOGS) {
                         MRadioLogsPage(
                             modifier = Modifier.fillMaxSize(),
-                            onBack = { onPageChange(SettingsDestination.MAIN) },
                         )
                     } else {
                     Column(
