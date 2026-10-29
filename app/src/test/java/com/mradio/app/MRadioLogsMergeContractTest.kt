@@ -25,7 +25,7 @@ class MRadioLogsMergeContractTest {
         assertTrue(read("app/src/main/java/com/mradio/app/UnifiedLogsPage.kt").contains("AppLog.version.collectAsState()"))
         assertTrue(read("app/src/main/java/com/mradio/app/UnifiedLogsPage.kt").contains("Switch(checked = enabled"))
         assertTrue(read("app/src/main/java/com/mradio/app/UnifiedLogsPage.kt").contains("maxHeight < 430.dp"))
-        assertTrue(read("app/src/main/java/com/mradio/app/UnifiedLogsPage.kt").contains("onClick = onBack"))
+        assertFalse(read("app/src/main/java/com/mradio/app/UnifiedLogsPage.kt").contains("Text(\"Back\")"))
         assertFalse(logs.contains("class LogsActivity"))
         assertFalse(logs.contains("MaterialTheme {"))
         assertFalse(manifest.contains("LogsActivity"))
