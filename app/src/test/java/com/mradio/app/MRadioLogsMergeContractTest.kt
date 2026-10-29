@@ -19,7 +19,7 @@ class MRadioLogsMergeContractTest {
         assertFalse(destinations.contains("DIAGNOSTICS"))
         assertTrue(settings.contains("onPageChange(SettingsDestination.LOGS)"))
         assertTrue(settings.contains("MRadioLogsPage("))
-        assertTrue(screen.contains("SettingsDestination.LOGS -> Icons.Rounded.BugReport"))
+        assertTrue(screen.contains("SettingsDestination.LOGS -> Icons.Rounded.Article"))
         assertTrue(logs.contains("Library.events.collectAsState()"))
         assertTrue(logs.contains("Library::clearPlaybackLog"))
         assertTrue(read("app/src/main/java/com/mradio/app/UnifiedLogsPage.kt").contains("AppLog.version.collectAsState()"))
@@ -29,5 +29,6 @@ class MRadioLogsMergeContractTest {
         assertFalse(logs.contains("class LogsActivity"))
         assertFalse(logs.contains("MaterialTheme {"))
         assertFalse(manifest.contains("LogsActivity"))
+        assertTrue(settings.contains("leadingContent = { Icon(Icons.Rounded.Article, null) }"))
     }
 }
