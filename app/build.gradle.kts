@@ -26,7 +26,7 @@ android {
 
 
     buildTypes {
-        getByName("debug") { applicationIdSuffix = ".experimental"; versionNameSuffix = "-debug" }
+        getByName("debug") { versionNameSuffix = "-debug" }
         getByName("release") {
             // R8 removes unused code (most of Compose and the icon set) and resources.
             isMinifyEnabled = true
