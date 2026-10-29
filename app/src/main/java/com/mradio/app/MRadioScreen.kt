@@ -49,7 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.BarChart
-import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.ArrowDropDown
@@ -504,7 +504,7 @@ fun MRadioScreen(
                                         SettingsDestination.CUSTOM_STATIONS -> Icons.Rounded.AddCircleOutline
                                         SettingsDestination.BACKUP -> Icons.Rounded.Save
                                         SettingsDestination.UPDATES -> Icons.Rounded.SystemUpdate
-                                        SettingsDestination.DIAGNOSTICS -> Icons.Rounded.BugReport
+                                        SettingsDestination.LOGS -> Icons.Rounded.Article
                                     }
                                     homeTab == RadioDestination.SEARCH -> Icons.Rounded.Search
                                     else -> Icons.Rounded.Home

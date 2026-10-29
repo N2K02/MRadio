@@ -20,7 +20,7 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Save
@@ -76,7 +76,6 @@ internal fun RadioSettings(
     val experimentalEnabled by LiveUpdater.experimentalEnabled.collectAsState()
     val updaterState by LiveUpdater.controller.status.collectAsState()
     val updateAvailable = updaterState.hasPendingUpdate()
-    val playbackEvents by Library.events.collectAsState()
     val listeningStats by Library.listeningStats.collectAsState()
     val stationList by Library.stations.collectAsState()
     val alarmAt by RadioAlarm.alarmAt.collectAsState()
@@ -174,6 +173,11 @@ internal fun RadioSettings(
                     modifier = Modifier.fillMaxSize(),
                     label = "Settings navigation",
                 ) { current ->
+                    if (current == SettingsDestination.LOGS) {
+                        MRadioLogsPage(
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
                     Column(
                         modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -218,10 +222,10 @@ internal fun RadioSettings(
                             )
                             HorizontalDivider()
                             ListItem(
-                                headlineContent = { Text("Connection diagnostics") },
-                                supportingContent = { Text("Playback, buffering and stream errors") },
-                                leadingContent = { Icon(Icons.Rounded.BugReport, null) },
-                                modifier = Modifier.clickable { onPageChange(SettingsDestination.DIAGNOSTICS) },
+                                headlineContent = { Text("Logs") },
+                                supportingContent = { Text("Playback, buffering, stream errors and private diagnostic history") },
+                                leadingContent = { Icon(Icons.Rounded.Article, null) },
+                                modifier = Modifier.clickable { onPageChange(SettingsDestination.LOGS) },
                             )
                             ListItem(
                                 headlineContent = { Text("About & updates") },
@@ -464,21 +468,6 @@ internal fun RadioSettings(
                                     TextButton(onClick = Library::clearListeningStats) { Text("Reset") }
                                 },
                             )
-                        } else if (current == SettingsDestination.DIAGNOSTICS) {
-                            ListItem(
-                                headlineContent = { Text("Playback events") },
-                                supportingContent = { Text("Session-only activity; no stream URLs or personal data") },
-                                trailingContent = {
-                                    TextButton(onClick = Library::clearPlaybackLog) { Text("Clear") }
-                                },
-                            )
-                            if (playbackEvents.isEmpty()) {
-                                ListItem(headlineContent = { Text("No events yet") })
-                            } else {
-                                playbackEvents.forEach { event ->
-                                    ListItem(headlineContent = { Text(event) })
-                                }
-                            }
                         } else {
                             dev.n2k02.updater.N2K02UpdateScreen(
                                 controller = LiveUpdater.controller,
@@ -488,6 +477,7 @@ internal fun RadioSettings(
                                 onExperimentalEnabledChange = LiveUpdater::setExperimentalEnabled,
                             )
                         }
+                    }
                     }
                 }
         }
