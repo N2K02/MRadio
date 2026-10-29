@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LiveUpdater.init(this)
+        AppLog.init(applicationContext)
         enableEdgeToEdge()
         Library.init(this)
         receiveSharedStream(intent)

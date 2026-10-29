@@ -15,7 +15,7 @@ internal enum class RadioDestination {
 
 /** Settings subpages, intentionally independent of the bottom navigation destination. */
 internal enum class SettingsDestination {
-    MAIN, PLAYBACK, ALARM, STATISTICS, CUSTOM_STATIONS, BACKUP, UPDATES, DIAGNOSTICS;
+    MAIN, PLAYBACK, ALARM, STATISTICS, CUSTOM_STATIONS, BACKUP, UPDATES, LOGS;
 
     val title: String get() = when (this) {
         MAIN -> "Settings"
@@ -25,6 +25,6 @@ internal enum class SettingsDestination {
         CUSTOM_STATIONS -> "Custom stations"
         BACKUP -> "Backup & restore"
         UPDATES -> "About & updates"
-        DIAGNOSTICS -> "Connection diagnostics"
+        LOGS -> "Logs"
     }
 }

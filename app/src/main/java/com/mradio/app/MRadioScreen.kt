@@ -504,7 +504,7 @@ fun MRadioScreen(
                                         SettingsDestination.CUSTOM_STATIONS -> Icons.Rounded.AddCircleOutline
                                         SettingsDestination.BACKUP -> Icons.Rounded.Save
                                         SettingsDestination.UPDATES -> Icons.Rounded.SystemUpdate
-                                        SettingsDestination.DIAGNOSTICS -> Icons.Rounded.BugReport
+                                        SettingsDestination.LOGS -> Icons.Rounded.BugReport
                                     }
                                     homeTab == RadioDestination.SEARCH -> Icons.Rounded.Search
                                     else -> Icons.Rounded.Home
