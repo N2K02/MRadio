@@ -20,7 +20,7 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Save
@@ -224,7 +224,7 @@ internal fun RadioSettings(
                             ListItem(
                                 headlineContent = { Text("Logs") },
                                 supportingContent = { Text("Playback, buffering, stream errors and private diagnostic history") },
-                                leadingContent = { Icon(Icons.Rounded.BugReport, null) },
+                                leadingContent = { Icon(Icons.Rounded.Article, null) },
                                 modifier = Modifier.clickable { onPageChange(SettingsDestination.LOGS) },
                             )
                             ListItem(
