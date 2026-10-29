@@ -223,6 +223,15 @@ internal fun RadioSettings(
                                 leadingContent = { Icon(Icons.Rounded.BugReport, null) },
                                 modifier = Modifier.clickable { onPageChange(SettingsDestination.DIAGNOSTICS) },
                             )
+                            val logScreenContext = androidx.compose.ui.platform.LocalContext.current
+                            ListItem(
+                                headlineContent = { Text("Logs") },
+                                supportingContent = { Text("Private diagnostic and crash history") },
+                                modifier = Modifier.clickable {
+                                    val app = logScreenContext
+                                    app.startActivity(android.content.Intent(app, com.mradio.app.LogsActivity::class.java))
+                                },
+                            )
                             ListItem(
                                 headlineContent = { Text("About & updates") },
                                 supportingContent = { Text(if (updateAvailable) "A new update is available" else "App version and update checks") },
