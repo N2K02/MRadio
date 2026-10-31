@@ -16,6 +16,7 @@ import java.nio.ByteBuffer
 class SoundProcessor : BaseAudioProcessor() {
     private val engine = SoundEngine()
     private var scratch = FloatArray(0)
+    private var lastStreamGeneration = SoundFx.streamGeneration
 
     override fun onConfigure(inputAudioFormat: AudioFormat): AudioFormat {
         val pcm = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT ||
@@ -28,6 +29,11 @@ class SoundProcessor : BaseAudioProcessor() {
     override fun queueInput(inputBuffer: ByteBuffer) {
         val size = inputBuffer.remaining()
         if (size == 0) return
+        val generation = SoundFx.streamGeneration
+        if (generation != lastStreamGeneration) {
+            lastStreamGeneration = generation
+            engine.resetNormalization()
+        }
         engine.apply(SoundFx.settings.value)
 
         val mono = inputAudioFormat.channelCount == 1

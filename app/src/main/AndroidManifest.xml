@@ -24,7 +24,6 @@
         android:label="MRadio"
         android:theme="@style/Theme.MRadio"
         android:usesCleartextTraffic="true">
-        <provider android:name="com.mradio.app.CrashJournalProvider" android:authorities="${applicationId}.crashjournal" android:exported="false" android:initOrder="100" />
 
 
         <!-- Tells Android Auto this is a media app -->

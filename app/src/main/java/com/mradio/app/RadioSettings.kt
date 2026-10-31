@@ -73,6 +73,7 @@ internal fun RadioSettings(
 ) {
     val phoneAutoPlay by Library.autoPlayPhone.collectAsState()
     val carAutoPlay by Library.autoPlayAuto.collectAsState()
+    val soundSettings by SoundFx.settings.collectAsState()
     val experimentalEnabled by LiveUpdater.experimentalEnabled.collectAsState()
     val updaterState by LiveUpdater.controller.status.collectAsState()
     val updateAvailable = updaterState.hasPendingUpdate()
@@ -173,11 +174,7 @@ internal fun RadioSettings(
                     modifier = Modifier.fillMaxSize(),
                     label = "Settings navigation",
                 ) { current ->
-                    if (current == SettingsDestination.LOGS) {
-                        MRadioLogsPage(
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
+                    run {
                     Column(
                         modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -221,12 +218,7 @@ internal fun RadioSettings(
                                 modifier = Modifier.clickable { onPageChange(SettingsDestination.BACKUP) },
                             )
                             HorizontalDivider()
-                            ListItem(
-                                headlineContent = { Text("Logs") },
-                                supportingContent = { Text("Playback, buffering, stream errors and private diagnostic history") },
-                                leadingContent = { Icon(Icons.Rounded.Article, null) },
-                                modifier = Modifier.clickable { onPageChange(SettingsDestination.LOGS) },
-                            )
+                            
                             ListItem(
                                 headlineContent = { Text("About & updates") },
                                 supportingContent = { Text(if (updateAvailable) "A new update is available" else "App version and update checks") },
@@ -252,6 +244,21 @@ internal fun RadioSettings(
                                 modifier = Modifier.clickable { Library.setAutoPlayAuto(!carAutoPlay) },
                             )
                             HorizontalDivider()
+                            ListItem(
+                                headlineContent = { Text("Normalize station volume") },
+                                supportingContent = { Text("Automatically balance quiet and loud radio streams") },
+                                trailingContent = {
+                                    Switch(
+                                        checked = soundSettings.normalizeVolume,
+                                        onCheckedChange = { enabled ->
+                                            SoundFx.update { it.copy(normalizeVolume = enabled) }
+                                        },
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    SoundFx.update { it.copy(normalizeVolume = !it.normalizeVolume) }
+                                },
+                            )
                             ListItem(
                                 headlineContent = { Text("Equalizer") },
                                 supportingContent = { Text("Adjust sound settings") },

@@ -475,6 +475,7 @@ class PlaybackService : MediaLibraryService() {
 
     /** Sets up the fallback queue for [station] and returns the item for its best stream. */
     private fun startStation(station: Station): MediaItem {
+        SoundFx.onNewStream()
         selectionEpoch++
         current = station
         // The Compose player resolves media IDs through Library.find(). A shared URL
@@ -626,6 +627,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun play(station: Station, url: String) {
+        SoundFx.onNewStream()
         player.setMediaItem(playableItem(station, url))
         player.prepare()
         player.play()
