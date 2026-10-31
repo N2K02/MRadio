@@ -195,6 +195,9 @@ class SoundEngine {
     private val shelf = Array(2) { Biquad() }
     private var shelfOn = false
     private var preamp = 1f
+    private var soundEffectsEnabled = true
+    private var normalizationEnabled = true
+    private var normalizer = LoudnessNormalizer(fs)
 
     private var mode = SpaceMode.OFF
     private var applied: SoundSettings? = null
@@ -227,6 +230,7 @@ class SoundEngine {
     fun configure(sampleRate: Int) {
         fs = sampleRate
         reverb = Reverb(fs)
+        normalizer = LoudnessNormalizer(fs)
         applied = null
         reset()
     }
@@ -239,12 +243,19 @@ class SoundEngine {
         orbitDelay.reset()
         orbitLp.reset()
         reverb.reset()
+        normalizer.reset()
     }
+
+    /** Keep the EQ and 3D filter state when only the selected stream changes. */
+    fun resetNormalization() = normalizer.reset()
 
     /** Picks up new settings (cheap when nothing changed). Call from the audio thread only. */
     fun apply(s: SoundSettings) {
         if (s === applied) return
         applied = s
+        soundEffectsEnabled = s.enabled
+        if (normalizationEnabled != s.normalizeVolume) normalizer.reset()
+        normalizationEnabled = s.normalizeVolume
 
         var maxBoost = 0f
         for (b in SoundFx.BAND_HZ.indices) {
@@ -302,7 +313,8 @@ class SoundEngine {
         crossNorm = 1f / (1f + crossGain * 0.6f)
         reverbWet = mix * 3f
 
-        bypass = !s.enabled || (mode == SpaceMode.OFF && !shelfOn && eqOn.none { it })
+        bypass = !normalizationEnabled && (!soundEffectsEnabled ||
+            (mode == SpaceMode.OFF && !shelfOn && eqOn.none { it }))
     }
 
     private fun setReverb(feedback: Float, damp: Float, preSeconds: Float) {
@@ -318,21 +330,31 @@ class SoundEngine {
             var l = buf[2 * n]
             var r = buf[2 * n + 1]
 
-            for (b in eqOn.indices) if (eqOn[b]) {
-                l = eq[0][b].process(l)
-                r = eq[1][b].process(r)
-            }
-            if (shelfOn) {
-                l = shelf[0].process(l)
-                r = shelf[1].process(r)
-            }
-            l *= preamp
-            r *= preamp
+            if (soundEffectsEnabled) {
+                for (b in eqOn.indices) if (eqOn[b]) {
+                    l = eq[0][b].process(l)
+                    r = eq[1][b].process(r)
+                }
+                if (shelfOn) {
+                    l = shelf[0].process(l)
+                    r = shelf[1].process(r)
+                }
+                l *= preamp
+                r *= preamp
 
-            space(l, r)
+                space(l, r)
+                l = outL
+                r = outR
+            }
+            if (normalizationEnabled) {
+                // Normalise post-EQ/3D loudness; preserve stereo balance with one gain.
+                val gain = normalizer.nextGain(l, r)
+                l *= gain
+                r *= gain
+            }
 
-            buf[2 * n] = soft(outL)
-            buf[2 * n + 1] = soft(outR)
+            buf[2 * n] = soft(l)
+            buf[2 * n + 1] = soft(r)
         }
     }
 

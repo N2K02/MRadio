@@ -21,6 +21,8 @@ enum class SpaceMode(val label: String, val blurb: String) {
 /** Everything the equalizer screen can change. Saved between launches. */
 data class SoundSettings(
     val enabled: Boolean = true,
+    /** Automatically match the perceived loudness of quiet and loud stations. */
+    val normalizeVolume: Boolean = true,
     /** Gain in dB for [SoundFx.BAND_HZ], each -12..+12. */
     val bands: List<Float> = List(SoundFx.BAND_HZ.size) { 0f },
     /** Extra low-end, 0..1. */
@@ -56,6 +58,12 @@ object SoundFx {
     private val _settings = MutableStateFlow(SoundSettings())
     val settings: StateFlow<SoundSettings> = _settings
 
+    // Updated when a station or its fallback stream changes. Read on the audio thread.
+    @Volatile var streamGeneration: Int = 0
+        private set
+
+    fun onNewStream() { streamGeneration++ }
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("mradio_sound", Context.MODE_PRIVATE)
@@ -64,6 +72,7 @@ object SoundFx {
             val a = o.getJSONArray("bands")
             _settings.value = SoundSettings(
                 enabled = o.optBoolean("enabled", true),
+                normalizeVolume = o.optBoolean("normalizeVolume", true),
                 bands = List(BAND_HZ.size) { a.optDouble(it, 0.0).toFloat().coerceIn(-12f, 12f) },
                 bass = o.optDouble("bass", 0.0).toFloat().coerceIn(0f, 1f),
                 mode = runCatching { SpaceMode.valueOf(o.optString("mode")) }.getOrDefault(SpaceMode.OFF),
@@ -87,13 +96,14 @@ object SoundFx {
         update { it.copy(bands = bands, preset = name) }
     }
 
-    fun reset() = update { SoundSettings(enabled = it.enabled) }
+    fun reset() = update { SoundSettings(enabled = it.enabled, normalizeVolume = it.normalizeVolume) }
 
     private fun save() {
         if (!::prefs.isInitialized) return
         val s = _settings.value
         val o = JSONObject()
             .put("enabled", s.enabled)
+            .put("normalizeVolume", s.normalizeVolume)
             .put("bands", JSONArray(s.bands.map { it.toDouble() }))
             .put("bass", s.bass.toDouble())
             .put("mode", s.mode.name)
