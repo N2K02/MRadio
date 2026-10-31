@@ -174,11 +174,7 @@ internal fun RadioSettings(
                     modifier = Modifier.fillMaxSize(),
                     label = "Settings navigation",
                 ) { current ->
-                    if (current == SettingsDestination.LOGS) {
-                        MRadioLogsPage(
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
+                    run {
                     Column(
                         modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -222,12 +218,7 @@ internal fun RadioSettings(
                                 modifier = Modifier.clickable { onPageChange(SettingsDestination.BACKUP) },
                             )
                             HorizontalDivider()
-                            ListItem(
-                                headlineContent = { Text("Logs") },
-                                supportingContent = { Text("Playback, buffering, stream errors and private diagnostic history") },
-                                leadingContent = { Icon(Icons.Rounded.Article, null) },
-                                modifier = Modifier.clickable { onPageChange(SettingsDestination.LOGS) },
-                            )
+                            
                             ListItem(
                                 headlineContent = { Text("About & updates") },
                                 supportingContent = { Text(if (updateAvailable) "A new update is available" else "App version and update checks") },
