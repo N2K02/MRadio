@@ -371,10 +371,15 @@ class PlaybackService : MediaLibraryService() {
     )
 
 
+    /** Avoid rebuilding the same RemoteViews and notifying SystemUI on unrelated updates. */
+    private var lastCustomControls: Triple<String?, String?, Boolean>? = null
+
     /** Experimental companion notification. Android's native Media3 player stays active. */
     private fun showCustomControls() {
         if (!::player.isInitialized || player.mediaItemCount == 0) return
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        val key = Triple(current?.id, current?.name, player.isPlaying)
+        if (key == lastCustomControls) return
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel(
             customNotificationChannel, "MRadio custom controls", NotificationManager.IMPORTANCE_LOW
@@ -401,10 +406,13 @@ class PlaybackService : MediaLibraryService() {
             .setStyle(Notification.DecoratedCustomViewStyle())
             .setOngoing(true)
             .build()
-        runCatching { manager.notify(customNotificationId, notification) }
+        if (runCatching { manager.notify(customNotificationId, notification) }.isSuccess) {
+            lastCustomControls = key
+        }
     }
 
     private fun dismissCustomControls() {
+        lastCustomControls = null
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
             .cancel(customNotificationId)
     }
