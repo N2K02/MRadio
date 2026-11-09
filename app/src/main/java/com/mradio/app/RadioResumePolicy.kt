@@ -11,6 +11,10 @@ package com.mradio.app
 internal object RadioResumePolicy {
     fun isVolumeKey(code: Int): Boolean = code == 24 || code == 25 || code == 164
 
+    fun isHuaweiFamily(manufacturer: String): Boolean =
+        manufacturer.equals("huawei", ignoreCase = true) ||
+            manufacturer.equals("honor", ignoreCase = true)
+
     fun allowBackgroundResumption(
         manufacturer: String,
         controllerPackage: String,
@@ -20,8 +24,7 @@ internal object RadioResumePolicy {
     ): Boolean {
         if (controllerPackage == autoPackage) return autoPlayEnabled
         if (controllerPackage == appPackage) return true
-        val huaweiFamily = manufacturer.equals("huawei", ignoreCase = true) ||
-            manufacturer.equals("honor", ignoreCase = true)
+        val huaweiFamily = isHuaweiFamily(manufacturer)
         val isSystemUi = controllerPackage.equals("com.android.systemui", ignoreCase = true) ||
             controllerPackage.equals("com.huawei.systemui", ignoreCase = true) ||
             controllerPackage.equals("com.hihonor.systemui", ignoreCase = true)
