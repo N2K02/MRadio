@@ -19,9 +19,17 @@ class RadioResumePolicyTest {
             "com.google.android.projection.gearhead", auto
         )
 
-    @Test fun huaweiSystemCannotResurrectStoppedRadio() {
+    @Test fun huaweiSystemUiCannotResurrectStoppedRadio() {
         assertFalse(allowed("HUAWEI", "com.android.systemui"))
-        assertFalse(allowed("HONOR", "com.huawei.systemserver"))
+        assertFalse(allowed("Huawei", "com.huawei.systemui"))
+        assertFalse(allowed("HONOR", "com.hihonor.systemui"))
+    }
+
+    @Test fun huaweiBluetoothAndExternalPlayRemainAvailable() {
+        assertTrue(allowed("HUAWEI", "com.android.bluetooth"))
+        assertTrue(allowed("HONOR", "com.google.android.bluetooth"))
+        assertTrue(allowed("Huawei", "com.android.car.media"))
+        assertTrue(allowed("Huawei", "com.example.musiccontroller"))
     }
 
     @Test fun explicitAppAndAutoPlaybackStillAllowed() {
