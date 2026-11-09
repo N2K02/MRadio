@@ -1,9 +1,12 @@
 package com.mradio.app
 
 /**
- * Keep vendor volume-key dispatch from resurrecting a stopped radio.
- * Explicit playback from the app or a connected controller with an existing queue
- * is unaffected; this policy applies only when Media3 has no item and asks to resume.
+ * Only suppress Huawei/Honor System UI playback restoration, not all external
+ * controller requests. Bluetooth headsets, cars and other external controllers
+ * can legitimately send an explicit Play after playback has stopped.
+ *
+ * This does not distinguish a genuine System UI Resume tap from an OEM-generated
+ * phantom command; Huawei device logs are required before narrowing further.
  */
 internal object RadioResumePolicy {
     fun isVolumeKey(code: Int): Boolean = code == 24 || code == 25 || code == 164
@@ -17,9 +20,11 @@ internal object RadioResumePolicy {
     ): Boolean {
         if (controllerPackage == autoPackage) return autoPlayEnabled
         if (controllerPackage == appPackage) return true
-        // Huawei/EMUI sometimes converts a hardware volume interaction into a
-        // system-requested media resume. Do not start a stopped radio implicitly.
-        return !manufacturer.equals("huawei", ignoreCase = true) &&
-            !manufacturer.equals("honor", ignoreCase = true)
+        val huaweiFamily = manufacturer.equals("huawei", ignoreCase = true) ||
+            manufacturer.equals("honor", ignoreCase = true)
+        val isSystemUi = controllerPackage.equals("com.android.systemui", ignoreCase = true) ||
+            controllerPackage.equals("com.huawei.systemui", ignoreCase = true) ||
+            controllerPackage.equals("com.hihonor.systemui", ignoreCase = true)
+        return !(huaweiFamily && isSystemUi)
     }
 }
