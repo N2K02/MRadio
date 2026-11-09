@@ -223,6 +223,9 @@ class PlaybackService : MediaLibraryService() {
             // The user paused: stop trying to reconnect.
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) cancelRetry()
+                if (playWhenReady && RadioResumePolicy.isHuaweiFamily(Build.MANUFACTURER)) {
+                    Library.logPlayback("Playback enabled · reason=$reason · state=${player.playbackState}")
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) = updateAudioInfo()
@@ -790,6 +793,11 @@ class PlaybackService : MediaLibraryService() {
             if (key != null && RadioResumePolicy.isVolumeKey(key.keyCode)) {
                 Library.logPlayback("Ignored volume media event · key=${key.keyCode}")
                 return true
+            }
+            if (key != null && key.action == KeyEvent.ACTION_DOWN &&
+                RadioResumePolicy.isHuaweiFamily(Build.MANUFACTURER)
+            ) {
+                Library.logPlayback("Media key received · key=${key.keyCode} · controller=${controllerInfo.packageName}")
             }
             return super.onMediaButtonEvent(session, controllerInfo, intent)
         }
