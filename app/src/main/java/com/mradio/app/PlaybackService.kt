@@ -16,6 +16,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.KeyEvent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -222,6 +223,9 @@ class PlaybackService : MediaLibraryService() {
             // The user paused: stop trying to reconnect.
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) cancelRetry()
+                if (playWhenReady && RadioResumePolicy.isHuaweiFamily(Build.MANUFACTURER)) {
+                    Library.logPlayback("Playback enabled · reason=$reason · state=${player.playbackState}")
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) = updateAudioInfo()
@@ -774,6 +778,30 @@ class PlaybackService : MediaLibraryService() {
 
     private inner class LibraryCallback : MediaLibrarySession.Callback {
 
+        override fun onMediaButtonEvent(
+            session: MediaSession,
+            controllerInfo: MediaSession.ControllerInfo,
+            intent: Intent,
+        ): Boolean {
+            // Volume keys belong to the system even if a vendor sends them to our media session.
+            val key = if (Build.VERSION.SDK_INT >= 33) {
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+            }
+            if (key != null && RadioResumePolicy.isVolumeKey(key.keyCode)) {
+                Library.logPlayback("Ignored volume media event · key=${key.keyCode}")
+                return true
+            }
+            if (key != null && key.action == KeyEvent.ACTION_DOWN &&
+                RadioResumePolicy.isHuaweiFamily(Build.MANUFACTURER)
+            ) {
+                Library.logPlayback("Media key received · key=${key.keyCode} · controller=${controllerInfo.packageName}")
+            }
+            return super.onMediaButtonEvent(session, controllerInfo, intent)
+        }
+
         /** Lets the app's own player bar ask for the next/previous station (see StationCommands). */
         override fun onConnect(
             session: MediaSession,
@@ -958,8 +986,15 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = future {
             // Android Auto may request resumption after connecting. Respect its
             // separate opt-in preference without affecting phone or Bluetooth controls.
-            val isAndroidAuto = controller.packageName == "com.google.android.projection.gearhead"
-            if (isAndroidAuto && !Library.autoPlayAuto.value) {
+            val allowResume = RadioResumePolicy.allowBackgroundResumption(
+                manufacturer = Build.MANUFACTURER,
+                controllerPackage = controller.packageName,
+                appPackage = packageName,
+                autoPackage = "com.google.android.projection.gearhead",
+                autoPlayEnabled = Library.autoPlayAuto.value,
+            )
+            if (!allowResume) {
+                Library.logPlayback("Ignored background resumption · controller=${controller.packageName}")
                 MediaSession.MediaItemsWithStartPosition(emptyList(), 0, C.TIME_UNSET)
             } else {
                 // A browser connection alone never starts audio. Only the media
