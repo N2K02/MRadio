@@ -188,6 +188,8 @@ internal class Reverb(private val fs: Int) {
 }
 
 class SoundEngine {
+    private companion object { const val ORBIT_BLOCK = 16 }
+
     private var fs = 44100
     private var reverb = Reverb(fs)
     private val eq = Array(2) { Array(SoundFx.BAND_HZ.size) { Biquad() } }
@@ -220,6 +222,13 @@ class SoundEngine {
     private var theta = 0.0
     private var thetaStep = 0.0
     private var maxItd = 20f
+    private var orbitCountdown = 0
+    private var orbitGl = 1f
+    private var orbitGr = 1f
+    private var orbitDl = 0f
+    private var orbitDr = 0f
+    private var orbitRear = 0f
+    private var orbitFront = 1f
     private val orbitDelay = DelayLine(512)
     private val orbitLp = Biquad()
 
@@ -396,32 +405,38 @@ class SoundEngine {
      * small delay for the far ear; behind is muffled. A little of the original width stays.
      */
     private fun orbit(l: Float, r: Float) {
-        theta += thetaStep
-        if (theta > 2 * PI) theta -= 2 * PI
-        val s = sin(theta).toFloat() // +1 = right ear, -1 = left ear
-        val c = cos(theta).toFloat() // +1 = in front, -1 = behind
+        // The source takes 9 s per lap, so the pan only needs updating every
+        // ORBIT_BLOCK samples (~0.3 ms): ~16x fewer sin/cos than per sample, inaudible.
+        if (orbitCountdown <= 0) {
+            orbitCountdown = ORBIT_BLOCK
+            theta += thetaStep * ORBIT_BLOCK
+            if (theta > 2 * PI) theta -= 2 * PI
+            val s = sin(theta).toFloat() // +1 = right ear, -1 = left ear
+            val c = cos(theta).toFloat() // +1 = in front, -1 = behind
+            val angle = (s * depth * 0.8f + 1f) * (PI.toFloat() / 4f) // equal-power pan, never fully hard
+            orbitGl = cos(angle) * 1.4142135f
+            orbitGr = sin(angle) * 1.4142135f
+            orbitDl = max(0f, s) * maxItd * depth // source on the right: the left ear hears it later
+            orbitDr = max(0f, -s) * maxItd * depth
+            orbitRear = max(0f, -c) * 0.7f * depth
+            orbitFront = 1f + 0.1f * c * depth
+        }
+        orbitCountdown--
 
         val mid = (l + r) * 0.5f
         val side = (l - r) * 0.5f
         orbitDelay.write(mid)
 
-        val angle = (s * depth * 0.8f + 1f) * (PI.toFloat() / 4f) // equal-power pan, never fully hard
-        val gl = cos(angle) * 1.4142135f
-        val gr = sin(angle) * 1.4142135f
-        val dl = max(0f, s) * maxItd * depth // source on the right: the left ear hears it later
-        val dr = max(0f, -s) * maxItd * depth
-
-        val rear = max(0f, -c) * 0.7f * depth
-        val front = 1f + 0.1f * c * depth
         val dull = orbitLp.process(mid) // keep the filter running so it never glitches
-        val xl = orbitDelay.read(dl)
-        val xr = orbitDelay.read(dr)
+        val xl = orbitDelay.read(orbitDl)
+        val xr = orbitDelay.read(orbitDr)
+        val rear = orbitRear
         val blendL = xl * (1 - rear) + dull * rear
         val blendR = xr * (1 - rear) + dull * rear
 
         val keep = 0.5f * (1f - depth * 0.5f)
-        outL = blendL * gl * front + side * keep
-        outR = blendR * gr * front - side * keep
+        outL = blendL * orbitGl * orbitFront + side * keep
+        outR = blendR * orbitGr * orbitFront - side * keep
     }
 
     private fun soft(x: Float): Float {
