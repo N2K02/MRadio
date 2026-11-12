@@ -62,9 +62,9 @@ android {
 dependencies {
     // Off by default until the private package and CI read-only credentials are ready.
     implementation("dev.n2k02:updater:0.1.32") // Live updater controller and UI
-    implementation("dev.n2k02:theme:0.1.5") // Live Material 3 Expressive theme
+    implementation("dev.n2k02:theme:0.1.14") // Live Material 3 Expressive theme
     // Material 3 Expressive (MaterialExpressiveTheme, expressive shapes/motion/components)
-    implementation("androidx.compose.material3:material3:1.5.0-beta02")
+    implementation("androidx.compose.material3:material3:1.5.0-rc01")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation("androidx.graphics:graphics-shapes:1.1.0")
     implementation("androidx.activity:activity-compose:1.11.0")
