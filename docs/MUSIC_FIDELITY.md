@@ -25,3 +25,8 @@ coalescing and sample-rate validation. Playback keeps its last complete plan unt
 new settings/headroom pair is ready; initial playback remains neutral while preparing.
 The render callback no longer runs the response scan. Tests cover coalescing, stale route
 results and equivalence with synchronous DSP preparation.
+
+Non-finite source samples are replaced with silence before entering EQ, spatial delays
+or normalisation, so one corrupt decoder sample cannot permanently poison playback.
+Biquad state flushes inaudible subnormal tails to keep silent processing inexpensive.
+Recovery is tested across every spatial mode.

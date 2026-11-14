@@ -38,6 +38,9 @@ internal class Biquad {
         val y = b0 * xd + z1
         z1 = b1 * xd - a1 * y + z2
         z2 = b2 * xd - a2 * y
+        // Flush inaudible IIR tails before double subnormals waste CPU on silence.
+        if (abs(z1) < 1e-25) z1 = 0.0
+        if (abs(z2) < 1e-25) z2 = 0.0
         return y.toFloat()
     }
 
@@ -295,8 +298,8 @@ class SoundEngine {
                     neutralAfterTransition = bypass; bypass = false
                 }
             } else transition = minOf(1f, transition + transitionStep)
-            var l = buf[2 * n]
-            var r = buf[2 * n + 1]
+            var l = buf[2 * n].takeIf { it.isFinite() } ?: 0f
+            var r = buf[2 * n + 1].takeIf { it.isFinite() } ?: 0f
 
             if (soundEffectsEnabled) {
                 for (b in eqOn.indices) if (eqOn[b]) {

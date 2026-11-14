@@ -80,8 +80,10 @@ class SoundProcessor : BaseAudioProcessor() {
         out.flip()
     }
 
-    private fun readSample(b: ByteBuffer, isFloat: Boolean): Float =
-        if (isFloat) b.getFloat() else b.getShort() / 32768f
+    private fun readSample(b: ByteBuffer, isFloat: Boolean): Float {
+        val value = if (isFloat) b.getFloat() else b.getShort() / 32768f
+        return if (value.isFinite()) value else 0f
+    }
 
     override fun onFlush() = engine.reset()
 

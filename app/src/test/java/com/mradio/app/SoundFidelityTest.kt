@@ -49,4 +49,21 @@ class SoundFidelityTest {
         val after=FloatArray(4800); e.process(after,2400)
         assertTrue(after.all { abs(it)<1e-6f })
     }
+    @Test fun corruptSamplesDoNotPoisonEqOrSpatialState() {
+        for (mode in SpaceMode.entries) {
+            val e = SoundEngine().apply {
+                configure(48000)
+                apply(SoundSettings(bands = listOf(6f, 4f, 0f, 0f, 0f), mode = mode, intensity = 1f))
+            }
+            val corrupt = FloatArray(1024)
+            corrupt[0] = Float.NaN; corrupt[1] = Float.POSITIVE_INFINITY; corrupt[9] = Float.NEGATIVE_INFINITY
+            e.process(corrupt, corrupt.size / 2)
+            assertTrue(mode.name, corrupt.all { it.isFinite() })
+            val after = FloatArray(48000) { (.3 * sin(it / 2 * .13)).toFloat() }
+            e.process(after, after.size / 2)
+            assertTrue(mode.name, after.all { it.isFinite() && abs(it) <= .981f })
+            assertTrue("$mode recovers", after.any { abs(it) > .01f })
+        }
+    }
+
 }
