@@ -3,6 +3,8 @@ package com.mradio.app
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sqrt
 import kotlin.math.max
 import kotlin.math.sin
 
