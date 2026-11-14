@@ -1,6 +1,5 @@
 package com.mradio.app
 
-import dev.n2k02.updater.PublishedUpdateSource
 import dev.n2k02.updater.UpdateConfig
 import dev.n2k02.updater.UpdaterController
 import android.app.Activity
@@ -15,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
  * Keeps existing MRadio update behavior unchanged during the migration.
  */
 internal object SharedUpdaterBridge {
-    private const val manifestUrl = "https://n2k02.github.io/mradio/updates"
 
     /**
      * Creates an isolated controller for opt-in testing; callers retain ownership
@@ -31,7 +29,7 @@ internal object SharedUpdaterBridge {
         return UpdaterController(
             context = context,
             config = config,
-            publishedSource = PublishedUpdateSource(manifestUrl),
+
             offerPreferences = context.getSharedPreferences("app_updater", Context.MODE_PRIVATE),
         )
     }
