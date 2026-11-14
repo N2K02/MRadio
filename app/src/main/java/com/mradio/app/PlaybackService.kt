@@ -403,7 +403,7 @@ class PlaybackService : MediaLibraryService() {
             setOnClickPendingIntent(R.id.radio_next, action("com.mradio.app.NOTIF_NEXT", 210))
         }
         val notification = Notification.Builder(this, customNotificationChannel)
-            .setSmallIcon(R.drawable.ic_exit)
+            .setSmallIcon(com.mradio.app.R.drawable.ic_stat_app)
             .setContentTitle("MRadio")
             .setCustomContentView(view)
             .setCustomBigContentView(view)
