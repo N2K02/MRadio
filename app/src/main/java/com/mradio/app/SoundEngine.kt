@@ -212,7 +212,8 @@ class SoundEngine {
     }
 
     private fun applyNow(s: SoundSettings, headroom: Float) {
-        if (s === applied) return
+        // A pending change may have returned to this same settings instance.
+        // Recompute bypass after the fade; applyPrepared already deduplicates steady state.
         applied = s
         soundEffectsEnabled = s.enabled
         if (normalizationEnabled != s.normalizeVolume) normalizer.reset()

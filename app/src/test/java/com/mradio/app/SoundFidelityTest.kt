@@ -97,4 +97,16 @@ class SoundFidelityTest {
         assertArrayEquals(input, output, 0f)
     }
 
+    @Test fun cancellingAPresetChangeRestoresExactFlatBypass() {
+        val flat = SoundSettings(normalizeVolume = false)
+        val e = SoundEngine().apply { configure(48000); apply(flat) }
+        e.apply(flat.copy(bands = listOf(12f, 0f, 0f, 0f, 0f)))
+        e.apply(flat) // cancel before the old pending preset reaches the fade boundary
+        e.process(FloatArray(4800) { .99f }, 2400)
+        assertTrue("cancelled transition restores bypass", e.bypass)
+        val input = FloatArray(512) { if (it % 2 == 0) .99f else -.97f }
+        val output = input.copyOf(); e.process(output, output.size / 2)
+        assertArrayEquals(input, output, 0f)
+    }
+
 }

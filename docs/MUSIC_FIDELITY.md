@@ -44,3 +44,9 @@ Recovery is tested across every spatial mode.
   controlled screen-off run on the actual experimental APK before making power claims.
 
 Reference: https://android-developers.googleblog.com/2024/04/how-to-effectively-ab-test-power-consumption-for-your-android-app-features.html
+
+Final player-scenario review: returning to the exact Flat settings instance while a
+boosted preset is still pending now recalculates bypass after the fade. A dedicated
+regression asserts exact stereo passthrough after cancellation; 18 focused mRadio
+tests pass. Media3 owns audio focus/noisy-route handling and stream retry remains
+separate from DSP. Actual Bluetooth interruption and reconnect tests remain required.
