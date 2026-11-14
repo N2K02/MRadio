@@ -15,6 +15,7 @@ import java.nio.ByteBuffer
 @OptIn(UnstableApi::class)
 class SoundProcessor : BaseAudioProcessor() {
     private val engine = SoundEngine()
+    private val plans = SoundPlanWorker()
     private var scratch = FloatArray(0)
     private var lastStreamGeneration = SoundFx.streamGeneration
 
@@ -23,6 +24,9 @@ class SoundProcessor : BaseAudioProcessor() {
             inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
         if (!pcm || inputAudioFormat.channelCount !in 1..2) return AudioFormat.NOT_SET
         engine.configure(inputAudioFormat.sampleRate)
+        // Start neutral until the first complete, rate-matched plan is ready.
+        engine.applyPrepared(SoundSettings(enabled = false, normalizeVolume = false), 1f)
+        plans.request(SoundFx.settings.value, inputAudioFormat.sampleRate)
         return AudioFormat(inputAudioFormat.sampleRate, 2, inputAudioFormat.encoding)
     }
 
@@ -34,7 +38,12 @@ class SoundProcessor : BaseAudioProcessor() {
             lastStreamGeneration = generation
             engine.resetNormalization()
         }
-        engine.apply(SoundFx.settings.value)
+        val settings = SoundFx.settings.value
+        plans.request(settings, inputAudioFormat.sampleRate)
+        val prepared = plans.ready
+        if (prepared != null && prepared.rate == inputAudioFormat.sampleRate && prepared.settings === settings) {
+            engine.applyPrepared(prepared.settings, prepared.gain)
+        }
 
         val mono = inputAudioFormat.channelCount == 1
         val isFloat = inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
@@ -71,8 +80,10 @@ class SoundProcessor : BaseAudioProcessor() {
         out.flip()
     }
 
-    private fun readSample(b: ByteBuffer, isFloat: Boolean): Float =
-        if (isFloat) b.getFloat() else b.getShort() / 32768f
+    private fun readSample(b: ByteBuffer, isFloat: Boolean): Float {
+        val value = if (isFloat) b.getFloat() else b.getShort() / 32768f
+        return if (value.isFinite()) value else 0f
+    }
 
     override fun onFlush() = engine.reset()
 

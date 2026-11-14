@@ -11,7 +11,7 @@ import kotlin.math.sqrt
  * Silence is gated so gaps between tracks cannot wind the gain up.
  *
  * This is an approximate live loudness match, not an offline EBU R128 / LUFS scan.
- * Gain is limited to -12..+10 dB and the final SoundEngine soft limiter protects
+ * Gain is limited to -12..+10 dB and the final SoundEngine stereo peak guard protects
  * against clipping. No changes are made to the stream or system volume.
  */
 internal class LoudnessNormalizer(sampleRate: Int) {
