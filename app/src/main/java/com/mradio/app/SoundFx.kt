@@ -13,7 +13,7 @@ enum class SpaceMode(val label: String, val blurb: String) {
     OFF("Off", "Plain stereo, as the station sends it."),
     WIDE("Wide", "Pushes the sound out beyond the speakers or earbuds."),
     HEADPHONE_3D("Headphone 3D", "Puts the music in front of you, like speakers in a room. Best on headphones."),
-    HALL("Concert hall", "Adds the space and echo of a large hall."),
+    HALL("Concert hall", "Subtle stereo room, keeping the original music clear."),
     CINEMA("Cinema", "Wide, deep and enveloping."),
     ORBIT_8D("8D orbit", "The sound slowly circles around your head. Best on headphones."),
 }

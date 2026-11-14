@@ -4,24 +4,20 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
-import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlin.math.sqrt
-import kotlin.math.tanh
 
 /*
  * The sound engine: plain Kotlin, no Android classes, so it can be tested on a computer.
  *
  * Signal path for every stereo frame:
- *   5-band equalizer + bass shelf  ->  3D mode  ->  soft limiter
+ *   5-band equalizer + bass shelf  ->  3D mode  ->  linked peak guard
  *
  * The 3D modes are built from three classic tricks:
  *  - mid/side widening: turn up what differs between left and right;
  *  - cross-feed with a small delay and a low-pass: each ear also hears a muffled, slightly
  *    late copy of the other channel, like speakers in a room (this is what makes headphone
  *    sound feel "in front" instead of "inside the head");
- *  - a small reverb (Freeverb-style combs and all-passes) for space.
+ *  - a filtered, gain-normalised stereo room for space.
  * 8D orbit moves the sound around the head with level, delay and muffling cues.
  */
 
@@ -108,101 +104,28 @@ internal class DelayLine(minSize: Int) {
     fun reset() = buf.fill(0f)
 }
 
-private class Comb(size: Int) {
-    private val buf = FloatArray(size)
-    private var i = 0
-    private var store = 0f
-
-    fun process(input: Float, feedback: Float, damp: Float): Float {
-        val out = buf[i]
-        store = out * (1 - damp) + store * damp
-        if (abs(store) < 1e-20f) store = 0f // no denormals when the music stops
-        buf[i] = input + store * feedback
-        if (++i == buf.size) i = 0
-        return out
-    }
-
-    fun reset() {
-        buf.fill(0f)
-        store = 0f
-    }
-}
-
-private class AllPass(size: Int) {
-    private val buf = FloatArray(size)
-    private var i = 0
-
-    fun process(input: Float): Float {
-        val held = buf[i]
-        val out = -input + held
-        buf[i] = input + held * 0.5f
-        if (++i == buf.size) i = 0
-        return out
-    }
-
-    fun reset() = buf.fill(0f)
-}
-
-/** A small stereo reverb (4 combs + 2 all-passes per side, the right side slightly longer for width). */
-internal class Reverb(private val fs: Int) {
-    private fun scaled(n: Int) = max(1, (n * fs / 44100.0).roundToInt())
-    private val combLengths = intArrayOf(1116, 1188, 1277, 1356)
-    private val combL = Array(4) { Comb(scaled(combLengths[it])) }
-    private val combR = Array(4) { Comb(scaled(combLengths[it] + 23)) }
-    private val apL = arrayOf(AllPass(scaled(556)), AllPass(scaled(441)))
-    private val apR = arrayOf(AllPass(scaled(556 + 23)), AllPass(scaled(441 + 23)))
-    private val pre = DelayLine(fs / 10)
-
-    var feedback = 0.84f
-    var damp = 0.4f
-    var preSamples = 0f
-    var outL = 0f
-    var outR = 0f
-
-    fun process(inL: Float, inR: Float) {
-        pre.write((inL + inR) * 0.5f * 0.03f)
-        val x = pre.read(preSamples)
-        var l = 0f
-        var r = 0f
-        for (k in 0 until 4) {
-            l += combL[k].process(x, feedback, damp)
-            r += combR[k].process(x, feedback, damp)
-        }
-        for (k in 0 until 2) {
-            l = apL[k].process(l)
-            r = apR[k].process(r)
-        }
-        outL = l
-        outR = r
-    }
-
-    fun reset() {
-        combL.forEach { it.reset() }
-        combR.forEach { it.reset() }
-        apL.forEach { it.reset() }
-        apR.forEach { it.reset() }
-        pre.reset()
-        outL = 0f
-        outR = 0f
-    }
-}
-
 class SoundEngine {
     private companion object { const val ORBIT_BLOCK = 16 }
 
     private var fs = 44100
-    private var reverb = Reverb(fs)
+    private var reverb = MusicRoom(fs)
     private val eq = Array(2) { Array(SoundFx.BAND_HZ.size) { Biquad() } }
     private val eqOn = BooleanArray(SoundFx.BAND_HZ.size)
     private val shelf = Array(2) { Biquad() }
     private var shelfOn = false
     private var preamp = 1f
+    private var currentPreamp = 1f
+    private var guardGain = 1f
+    private var gainStep = 0.002f
     private var soundEffectsEnabled = true
     private var normalizationEnabled = true
     private var normalizer = LoudnessNormalizer(fs)
 
     private var mode = SpaceMode.OFF
     private var applied: SoundSettings? = null
+    private var pending: SoundSettings? = null
+    private var neutralAfterTransition = false
+    private var transition = 1f
 
     /** True when nothing would change the sound: the player then passes the audio through untouched. */
     var bypass = true
@@ -238,9 +161,12 @@ class SoundEngine {
     /** Call when the stream's sample rate is known or changes. */
     fun configure(sampleRate: Int) {
         fs = sampleRate
-        reverb = Reverb(fs)
+        gainStep = (1 - kotlin.math.exp(-1.0 / (0.02 * fs))).toFloat()
+        reverb = MusicRoom(fs)
         normalizer = LoudnessNormalizer(fs)
         applied = null
+        pending = null
+        transition = 1f
         reset()
     }
 
@@ -253,6 +179,8 @@ class SoundEngine {
         orbitLp.reset()
         reverb.reset()
         normalizer.reset()
+        currentPreamp = preamp
+        guardGain = 1f
     }
 
     /** Keep the EQ and 3D filter state when only the selected stream changes. */
@@ -260,31 +188,41 @@ class SoundEngine {
 
     /** Picks up new settings (cheap when nothing changed). Call from the audio thread only. */
     fun apply(s: SoundSettings) {
+        if (s === pending || (s === applied && pending == null)) return
+        if (applied == null || (!s.enabled && !soundEffectsEnabled)) {
+            applyNow(s)
+            currentPreamp = preamp
+        } else {
+            pending = s
+            bypass = false
+        }
+    }
+
+    private fun applyNow(s: SoundSettings) {
         if (s === applied) return
         applied = s
         soundEffectsEnabled = s.enabled
         if (normalizationEnabled != s.normalizeVolume) normalizer.reset()
         normalizationEnabled = s.normalizeVolume
 
-        var maxBoost = 0f
-        for (b in SoundFx.BAND_HZ.indices) {
+                for (b in SoundFx.BAND_HZ.indices) {
             val db = s.bands.getOrElse(b) { 0f }
             eqOn[b] = abs(db) >= 0.1f && SoundFx.BAND_HZ[b] < fs * 0.45
             if (eqOn[b]) {
                 for (ch in 0..1) eq[ch][b].peaking(fs, SoundFx.BAND_HZ[b].toDouble(), 0.9, db.toDouble())
-                maxBoost = max(maxBoost, db)
             }
         }
         val bassDb = s.bass * 9.0
         shelfOn = bassDb >= 0.1
         if (shelfOn) {
             for (ch in 0..1) shelf[ch].lowShelf(fs, 120.0, bassDb)
-            maxBoost = max(maxBoost, bassDb.toFloat())
         }
         // Make room for the boost so the loudest parts don't clip.
-        preamp = 10f.pow(-maxBoost * 0.5f / 20f)
+        preamp = MusicHeadroom.gain(s.bands, bassDb, fs)
 
-        mode = s.mode
+        val nextMode = if (s.intensity <= 0f) SpaceMode.OFF else s.mode
+        if (mode != nextMode) { reverb.reset(); crossDelay.forEach { it.reset() } }
+        mode = nextMode
         val i = s.intensity.coerceIn(0f, 1f)
         sideGain = 1f
         crossGain = 0f
@@ -294,48 +232,59 @@ class SoundEngine {
             SpaceMode.WIDE -> sideGain = 1f + 1.2f * i
             SpaceMode.HEADPHONE_3D -> {
                 sideGain = 1f + 0.5f * i
-                crossGain = 0.25f + 0.35f * i
+                crossGain = 0.45f * i
                 crossSamples = 0.00027f * fs
                 for (ch in 0..1) crossLp[ch].lowPass(fs, 700.0, 0.7)
-                mix = 0.05f + 0.08f * i
-                setReverb(0.80f, 0.5f, 0.010f)
+                mix = 0.04f * i
+                setReverb(0.65f)
             }
             SpaceMode.HALL -> {
-                sideGain = 1f + 0.2f * i
-                mix = 0.12f + 0.28f * i
-                setReverb(0.88f, 0.3f, 0.018f)
+                sideGain = 1f
+                mix = 0.15f * i
+                setReverb(0.70f)
             }
             SpaceMode.CINEMA -> {
                 sideGain = 1f + 0.8f * i
-                mix = 0.08f + 0.14f * i
-                setReverb(0.84f, 0.4f, 0.012f)
+                mix = 0.08f * i
+                setReverb(0.65f)
             }
             SpaceMode.ORBIT_8D -> {
                 depth = i
                 thetaStep = 2 * PI / (9.0 * fs) // one lap every 9 seconds
                 maxItd = 0.0006f * fs
                 orbitLp.lowPass(fs, 2500.0, 0.7)
-                mix = 0.05f + 0.10f * i
-                setReverb(0.80f, 0.5f, 0.008f)
+                mix = 0.04f * i
+                setReverb(0.65f)
             }
         }
-        crossNorm = 1f / (1f + crossGain * 0.6f)
-        reverbWet = mix * 3f
+        crossNorm = 1f / (1f + crossGain)
+        reverbWet = mix
+        reverb.wet = mix
+        val spatialBound = if (mode == SpaceMode.ORBIT_8D) 1f + 1.1f * i else sideGain
+        preamp /= spatialBound * (1f + 2f * mix)
 
         bypass = !normalizationEnabled && (!soundEffectsEnabled ||
             (mode == SpaceMode.OFF && !shelfOn && eqOn.none { it }))
     }
 
-    private fun setReverb(feedback: Float, damp: Float, preSeconds: Float) {
-        reverb.feedback = feedback
-        reverb.damp = damp
-        reverb.preSamples = preSeconds * fs
-    }
+    private fun setReverb(feedback: Float) { reverb.feedback = feedback }
 
     /** Processes [frames] interleaved stereo frames in place (samples in -1..1). */
     fun process(buf: FloatArray, frames: Int) {
         if (bypass) return
+        val transitionStep = 1f / (fs * 0.01f)
         for (n in 0 until frames) {
+            if (pending != null) {
+                transition = max(0f, transition - transitionStep)
+                if (transition == 0f) {
+                    val next = pending!!; pending = null
+                    // Change filter topology only while inaudible.
+                    eq.forEach { ch -> ch.forEach { it.reset() } }; shelf.forEach { it.reset() }
+                    reverb.reset(); crossDelay.forEach { it.reset() }; orbitDelay.reset()
+                    applyNow(next); currentPreamp = preamp
+                    neutralAfterTransition = bypass; bypass = false
+                }
+            } else transition = minOf(1f, transition + transitionStep)
             var l = buf[2 * n]
             var r = buf[2 * n + 1]
 
@@ -348,8 +297,9 @@ class SoundEngine {
                     l = shelf[0].process(l)
                     r = shelf[1].process(r)
                 }
-                l *= preamp
-                r *= preamp
+                currentPreamp += (preamp - currentPreamp) * gainStep
+                l *= currentPreamp
+                r *= currentPreamp
 
                 space(l, r)
                 l = outL
@@ -362,9 +312,14 @@ class SoundEngine {
                 r *= gain
             }
 
-            buf[2 * n] = soft(l)
-            buf[2 * n + 1] = soft(r)
+            // Linked gain reduction preserves stereo and is linear below the ceiling.
+            val peak = max(abs(l), abs(r))
+            val target = if (peak > 0.98f) 0.98f / peak else 1f
+            guardGain = if (target < guardGain) target else guardGain + (target - guardGain) * gainStep * 0.25f
+            buf[2 * n] = l * guardGain * transition
+            buf[2 * n + 1] = r * guardGain * transition
         }
+        if (transition >= 1f && pending == null && neutralAfterTransition) { bypass = true; neutralAfterTransition = false }
     }
 
     /** The 3D stage. Result in [outL] / [outR]. */
@@ -395,8 +350,8 @@ class SoundEngine {
         }
         if (reverbWet > 0f) {
             reverb.process(outL, outR)
-            outL += reverb.outL * reverbWet
-            outR += reverb.outR * reverbWet
+            outL = reverb.outL
+            outR = reverb.outR
         }
     }
 
@@ -434,15 +389,9 @@ class SoundEngine {
         val blendL = xl * (1 - rear) + dull * rear
         val blendR = xr * (1 - rear) + dull * rear
 
-        val keep = 0.5f * (1f - depth * 0.5f)
+        val keep = 1f - depth * 0.5f
         outL = blendL * orbitGl * orbitFront + side * keep
         outR = blendR * orbitGr * orbitFront - side * keep
     }
 
-    private fun soft(x: Float): Float {
-        val a = abs(x)
-        if (a <= 0.8f) return x
-        val y = 0.8f + 0.2f * tanh((a - 0.8f) / 0.2f)
-        return if (x < 0f) -y else y
-    }
 }
