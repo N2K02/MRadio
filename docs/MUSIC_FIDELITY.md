@@ -19,3 +19,9 @@ Regression checks cover all ten presets with extra bass, high-level sine distort
 0% neutrality, stereo separation, mode changes and stale tails. Tones establish linearity
 and peak safety for the tested cases; they do not replace music listening tests or prove
 intersample true-peak protection.
+
+Preset headroom scans now run on one shared background worker, with latest-settings
+coalescing and sample-rate validation. Playback keeps its last complete plan until the
+new settings/headroom pair is ready; initial playback remains neutral while preparing.
+The render callback no longer runs the response scan. Tests cover coalescing, stale route
+results and equivalence with synchronous DSP preparation.

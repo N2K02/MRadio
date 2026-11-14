@@ -128,6 +128,7 @@ class SoundEngine {
     private var pending: SoundSettings? = null
     private var neutralAfterTransition = false
     private var transition = 1f
+    private var pendingHeadroom = 1f
 
     /** True when nothing would change the sound: the player then passes the audio through untouched. */
     var bypass = true
@@ -188,19 +189,26 @@ class SoundEngine {
     /** Keep the EQ and 3D filter state when only the selected stream changes. */
     fun resetNormalization() = normalizer.reset()
 
-    /** Picks up new settings (cheap when nothing changed). Call from the audio thread only. */
+    /** Synchronous preparation for offline callers. Playback uses applyPrepared instead. */
     fun apply(s: SoundSettings) {
         if (s === pending || (s === applied && pending == null)) return
+        applyPrepared(s, MusicHeadroom.gain(s.bands, s.bass * 9.0, fs))
+    }
+
+    /** Production render path: headroom was computed by SoundPlanWorker. */
+    internal fun applyPrepared(s: SoundSettings, headroom: Float) {
+        if (s === pending || (s === applied && pending == null)) return
         if (applied == null || (!s.enabled && !soundEffectsEnabled)) {
-            applyNow(s)
+            applyNow(s, headroom)
             currentPreamp = preamp
         } else {
+            pendingHeadroom = headroom
             pending = s
             bypass = false
         }
     }
 
-    private fun applyNow(s: SoundSettings) {
+    private fun applyNow(s: SoundSettings, headroom: Float) {
         if (s === applied) return
         applied = s
         soundEffectsEnabled = s.enabled
@@ -220,7 +228,7 @@ class SoundEngine {
             for (ch in 0..1) shelf[ch].lowShelf(fs, 120.0, bassDb)
         }
         // Make room for the boost so the loudest parts don't clip.
-        preamp = MusicHeadroom.gain(s.bands, bassDb, fs)
+        preamp = headroom
 
         val nextMode = if (s.intensity <= 0f) SpaceMode.OFF else s.mode
         if (mode != nextMode) { reverb.reset(); crossDelay.forEach { it.reset() } }
@@ -283,7 +291,7 @@ class SoundEngine {
                     // Change filter topology only while inaudible.
                     eq.forEach { ch -> ch.forEach { it.reset() } }; shelf.forEach { it.reset() }
                     reverb.reset(); crossDelay.forEach { it.reset() }; orbitDelay.reset()
-                    applyNow(next); currentPreamp = preamp
+                    applyNow(next, pendingHeadroom); currentPreamp = preamp
                     neutralAfterTransition = bypass; bypass = false
                 }
             } else transition = minOf(1f, transition + transitionStep)
