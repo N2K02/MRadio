@@ -66,4 +66,35 @@ class SoundFidelityTest {
         }
     }
 
+    @Test fun fullLevelMultitoneAndImpulsesStayFiniteAndTailsRetire() {
+        for (rate in listOf(44100, 48000)) for (mode in SpaceMode.entries) {
+            for ((name, bands) in SoundFx.PRESETS) {
+                val e = SoundEngine().apply {
+                    configure(rate)
+                    apply(SoundSettings(normalizeVolume = false, bands = bands, bass = 1f, mode = mode, intensity = 1f))
+                }
+                val b = FloatArray(rate * 2) { i ->
+                    val frame = i / 2
+                    if (frame % 997 == 0) (if (i % 2 == 0) .99f else -.37f)
+                    else (.3 * sin(2 * PI * 60 * frame / rate) +
+                        .3 * sin(2 * PI * 997 * frame / rate + i % 2) +
+                        .3 * sin(2 * PI * 7000 * frame / rate)).toFloat()
+                }
+                e.process(b, rate)
+                assertTrue("$name $mode $rate", b.all { it.isFinite() && abs(it) <= .981f })
+                val silence = FloatArray(rate * 4)
+                e.process(silence, rate * 2)
+                assertTrue("$name $mode tail retired", silence.takeLast(200).all { abs(it) < 1e-6f })
+            }
+        }
+    }
+
+    @Test fun flatBypassPreservesStereoSamplesExactly() {
+        val e = SoundEngine().apply { configure(48000); apply(SoundSettings(normalizeVolume = false)) }
+        val input = FloatArray(4096) { (kotlin.random.Random(it).nextFloat() - .5f) * 1.9f }
+        val output = input.copyOf(); e.process(output, output.size / 2)
+        assertTrue(e.bypass)
+        assertArrayEquals(input, output, 0f)
+    }
+
 }

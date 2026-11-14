@@ -30,3 +30,17 @@ Non-finite source samples are replaced with silence before entering EQ, spatial 
 or normalisation, so one corrupt decoder sample cannot permanently poison playback.
 Biquad state flushes inaudible subnormal tails to keep silent processing inexpensive.
 Recovery is tested across every spatial mode.
+
+## Detailed fidelity and idle-power audit
+
+- The PCM callback has no periodic timer or separate playback stream. Disabled stages
+  are skipped, Flat with normalisation off uses exact stereo bypass, and unchanged
+  settings do not enqueue more preparation work.
+- Added high-level multitone/impulse tests across every preset and spatial mode at
+  44.1/48 kHz, including extra bass, output finiteness and complete tail retirement.
+- The focused mRadio suite passes 17 tests. These establish the checked signal properties;
+  they do not establish intersample true peaks or phone battery consumption.
+- Compare the same station/volume/route with EQ off, tonal EQ and Concert using a
+  controlled screen-off run on the actual experimental APK before making power claims.
+
+Reference: https://android-developers.googleblog.com/2024/04/how-to-effectively-ab-test-power-consumption-for-your-android-app-features.html
