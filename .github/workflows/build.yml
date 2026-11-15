@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ main ]
     types: [opened, synchronize, reopened]
+  pull_request_target:
+    types: [closed]
   workflow_dispatch:
     inputs:
       version:
@@ -18,20 +20,22 @@ permissions:
 
 # Cancel superseded builds for the same PR or main branch; each PR is independent.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.pull_request.number) || 'main' }}
   cancel-in-progress: true
 
 env:
   APP: MRadio
+  BUILD_COMMIT: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.merge_commit_sha || github.sha }}
 
 jobs:
   build:
     # Release-signing secrets are never exposed to PRs from forks.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name != 'pull_request_target' || (github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && !contains(github.event.pull_request.title, '[skip ci]')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.merge_commit_sha || github.sha }}
           fetch-depth: 0   # full history + tags, for the version number and release notes
 
       - uses: actions/setup-java@v6
@@ -86,9 +90,10 @@ jobs:
             fi
           fi
           echo "VERSION=$ver" >> "$GITHUB_ENV"
-          echo "VERSION_CODE=$(( 100000 + GITHUB_RUN_NUMBER ))" >> "$GITHUB_ENV"
+          VERSION_CODE=$(python3 .github/scripts/version_code.py "$GITHUB_REPOSITORY" "$GITHUB_RUN_NUMBER")
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            echo "APK_NAME=$APP-PR-${{ github.event.pull_request.number }}-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+            echo "APK_NAME=$APP-PR-${{ github.event.pull_request.number }}-${BUILD_COMMIT::7}" >> "$GITHUB_ENV"
           else
             echo "APK_NAME=$APP-$ver" >> "$GITHUB_ENV"
           fi
@@ -107,7 +112,7 @@ jobs:
           [ -n "$changes" ] || changes="- Rebuild, no code changes"
           {
             echo "## $APP $ver"
-            echo "Version code: $(( 100000 + GITHUB_RUN_NUMBER ))"
+            echo "Version code: $VERSION_CODE"
             echo
             echo "### What's new"
             echo "$changes"
@@ -115,7 +120,7 @@ jobs:
             echo "### Install"
             echo "Download the APK below and install it on your phone."
             echo
-            echo "_Built from \`${GITHUB_SHA::7}\`${prev:+ · changes since \`$prev\`}_"
+            echo "_Built from \`${BUILD_COMMIT::7}\`${prev:+ · changes since \`$prev\`}_"
           } > release-notes.md
           cat release-notes.md
 
@@ -208,7 +213,7 @@ jobs:
           else
             tag="v$VERSION"
             title="mRadio $VERSION"
-            target="$GITHUB_SHA"
+            target="$BUILD_COMMIT"
             extra=(--latest)
           fi
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
