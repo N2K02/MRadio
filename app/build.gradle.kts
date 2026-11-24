@@ -13,7 +13,7 @@ val appVersionSuffix = (findProperty("appVersionSuffix") as String?) ?: ""
 
 android {
     namespace = "com.mradio.app"
-    compileSdk = 37
+    compileSdk { version = release(37) { minorApiLevel = 2 } }
 
     defaultConfig {
         applicationId = "com.mradio.app"
@@ -61,10 +61,10 @@ android {
 
 dependencies {
     // Off by default until the private package and CI read-only credentials are ready.
-    implementation("dev.n2k02:updater:0.1.36") // Live updater controller and UI
+    implementation("dev.n2k02:updater:0.1.39") // Live updater controller and UI
     implementation("dev.n2k02:theme:0.1.15") // Live Material 3 Expressive theme
     // Material 3 Expressive (MaterialExpressiveTheme, expressive shapes/motion/components)
-    implementation("androidx.compose.material3:material3:1.5.0-rc01")
+    implementation("androidx.compose.material3:material3:1.6.0-alpha01")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation("androidx.graphics:graphics-shapes:1.1.0")
     implementation("androidx.activity:activity-compose:1.11.0")
