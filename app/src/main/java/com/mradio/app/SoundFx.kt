@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
 import org.json.JSONObject
 
 /** Station loudness preference, retained across upgrades. */
@@ -21,6 +20,7 @@ object SoundFx {
 
     fun onNewStream() { streamGeneration++ }
 
+    @Synchronized
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("mradio_sound", Context.MODE_PRIVATE)
@@ -31,8 +31,11 @@ object SoundFx {
         if (prefs.getString("settings", null) != JSONObject().put("normalizeVolume", _settings.value.normalizeVolume).toString()) save()
     }
 
+    @Synchronized
     fun update(change: (SoundSettings) -> SoundSettings) {
-        _settings.update { SoundSettings(normalizeVolume = change(it).normalizeVolume) }
+        val next = change(_settings.value)
+        if (next == _settings.value) return
+        _settings.value = next
         save()
     }
 
