@@ -51,6 +51,7 @@ class LoudnessNormalizerTest {
         engine.apply(SoundSettings(normalizeVolume = true))
         assertFalse(engine.bypass)
         engine.apply(SoundSettings(normalizeVolume = false))
+        repeat(fs / 10) { engine.nextGain(0.2f, 0.2f) }
         assertTrue(engine.bypass)
     }
 
@@ -73,5 +74,18 @@ class LoudnessNormalizerTest {
         val original = samples.copyOf()
         engine.process(samples, 2)
         org.junit.Assert.assertArrayEquals(original, samples, 0f)
+    }
+    @Test fun disablingNormalizationFadesRatherThanJumping() {
+        val engine = SoundEngine()
+        engine.configure(fs)
+        engine.apply(SoundSettings(true))
+        repeat(fs * 3) { engine.nextGain(0.5f, 0.5f) }
+        val before = engine.nextGain(0.5f, 0.5f)
+        engine.apply(SoundSettings(false))
+        val after = engine.nextGain(0.5f, 0.5f)
+        assertTrue(abs(after - before) < 0.01f)
+        repeat(fs / 10) { engine.nextGain(0.5f, 0.5f) }
+        assertTrue(engine.bypass)
+        assertEquals(1f, engine.nextGain(0.5f, 0.5f), 0f)
     }
 }
