@@ -28,7 +28,7 @@ object SoundFx {
             val o = JSONObject(prefs.getString("settings", null) ?: return@runCatching)
             _settings.value = SoundSettings(normalizeVolume = o.optBoolean("normalizeVolume", true))
         }
-        save()
+        if (prefs.getString("settings", null) != JSONObject().put("normalizeVolume", _settings.value.normalizeVolume).toString()) save()
     }
 
     fun update(change: (SoundSettings) -> SoundSettings) {
