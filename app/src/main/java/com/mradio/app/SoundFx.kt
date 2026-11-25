@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import org.json.JSONArray
 import org.json.JSONObject
 
 /** The "3D" part of the sound: how the stereo picture is reshaped. */
@@ -20,7 +19,7 @@ enum class SpaceMode(val label: String, val blurb: String) {
 
 /** Everything the equalizer screen can change. Saved between launches. */
 data class SoundSettings(
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     /** Automatically match the perceived loudness of quiet and loud stations. */
     val normalizeVolume: Boolean = true,
     /** Gain in dB for [SoundFx.BAND_HZ], each -12..+12. */
@@ -69,21 +68,13 @@ object SoundFx {
         prefs = context.applicationContext.getSharedPreferences("mradio_sound", Context.MODE_PRIVATE)
         runCatching {
             val o = JSONObject(prefs.getString("settings", null) ?: return@runCatching)
-            val a = o.getJSONArray("bands")
-            _settings.value = SoundSettings(
-                enabled = o.optBoolean("enabled", true),
-                normalizeVolume = o.optBoolean("normalizeVolume", true),
-                bands = List(BAND_HZ.size) { a.optDouble(it, 0.0).toFloat().coerceIn(-12f, 12f) },
-                bass = o.optDouble("bass", 0.0).toFloat().coerceIn(0f, 1f),
-                mode = runCatching { SpaceMode.valueOf(o.optString("mode")) }.getOrDefault(SpaceMode.OFF),
-                intensity = o.optDouble("intensity", 0.6).toFloat().coerceIn(0f, 1f),
-                preset = o.optString("preset", "Custom"),
-            )
+            _settings.value = SoundSettings(normalizeVolume = o.optBoolean("normalizeVolume", true))
         }
+        save()
     }
 
     fun update(change: (SoundSettings) -> SoundSettings) {
-        _settings.update(change)
+        _settings.update { SoundSettings(normalizeVolume = change(it).normalizeVolume) }
         save()
     }
 
@@ -101,14 +92,7 @@ object SoundFx {
     private fun save() {
         if (!::prefs.isInitialized) return
         val s = _settings.value
-        val o = JSONObject()
-            .put("enabled", s.enabled)
-            .put("normalizeVolume", s.normalizeVolume)
-            .put("bands", JSONArray(s.bands.map { it.toDouble() }))
-            .put("bass", s.bass.toDouble())
-            .put("mode", s.mode.name)
-            .put("intensity", s.intensity.toDouble())
-            .put("preset", s.preset)
+        val o = JSONObject().put("normalizeVolume", s.normalizeVolume)
         prefs.edit().putString("settings", o.toString()).apply()
     }
 }
