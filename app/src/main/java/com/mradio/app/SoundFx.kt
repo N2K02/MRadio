@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import org.json.JSONObject
 
 /** Station loudness preference, retained across upgrades. */
 data class SoundSettings(val normalizeVolume: Boolean = true)
@@ -24,11 +23,9 @@ object SoundFx {
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("mradio_sound", Context.MODE_PRIVATE)
-        runCatching {
-            val o = JSONObject(prefs.getString("settings", null) ?: return@runCatching)
-            _settings.value = SoundSettings(normalizeVolume = o.optBoolean("normalizeVolume", true))
-        }
-        if (prefs.getString("settings", null) != JSONObject().put("normalizeVolume", _settings.value.normalizeVolume).toString()) save()
+        val saved = prefs.getString("settings", null)
+        _settings.value = SoundPreferenceCodec.decode(saved)
+        if (saved != SoundPreferenceCodec.encode(_settings.value)) save()
     }
 
     @Synchronized
@@ -42,7 +39,6 @@ object SoundFx {
     private fun save() {
         if (!::prefs.isInitialized) return
         val s = _settings.value
-        val o = JSONObject().put("normalizeVolume", s.normalizeVolume)
-        prefs.edit().putString("settings", o.toString()).apply()
+        prefs.edit().putString("settings", SoundPreferenceCodec.encode(s)).apply()
     }
 }
