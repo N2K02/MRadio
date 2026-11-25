@@ -45,24 +45,33 @@ class LoudnessNormalizerTest {
         assertEquals(1f, normalizer.nextGain(0f, 0f), 0.0001f)
     }
 
-    @Test fun normalizationIsIndependentOfEqualizerToggle() {
+    @Test fun normalizationCanBeBypassed() {
         val engine = SoundEngine()
         engine.configure(fs)
-        engine.apply(SoundSettings(enabled = false, normalizeVolume = true))
+        engine.apply(SoundSettings(normalizeVolume = true))
         assertFalse(engine.bypass)
-        engine.apply(SoundSettings(enabled = false, normalizeVolume = false))
+        engine.apply(SoundSettings(normalizeVolume = false))
         assertTrue(engine.bypass)
     }
 
     @Test fun normalizedSignalStaysWithinPcmLimits() {
         val engine = SoundEngine()
         engine.configure(fs)
-        engine.apply(SoundSettings(enabled = false, normalizeVolume = true))
+        engine.apply(SoundSettings(normalizeVolume = true))
         val samples = FloatArray(4096)
         repeat(50) {
             for (i in samples.indices) samples[i] = if (i % 2 == 0) 0.95f else -0.95f
             engine.process(samples, samples.size / 2)
             assertTrue(samples.all { it in -1f..1f })
         }
+    }
+    @Test fun bypassPreservesSamplesExactly() {
+        val engine = SoundEngine()
+        engine.configure(fs)
+        engine.apply(SoundSettings(normalizeVolume = false))
+        val samples = floatArrayOf(0.2f, -0.7f, 1f, -1f)
+        val original = samples.copyOf()
+        engine.process(samples, 2)
+        org.junit.Assert.assertArrayEquals(original, samples, 0f)
     }
 }
