@@ -36,8 +36,10 @@ class SoundEngine {
     /** Returns a linked gain, preserving the native channel count and stereo balance. */
     fun nextGain(left: Float, right: Float): Float {
         if (bypass) return 1f
-        val gain = normalizer.nextGain(left, right)
-        val peak = max(abs(left), abs(right)) * gain
+        val l = if (left.isFinite()) left.coerceIn(-1f, 1f) else 0f
+        val r = if (right.isFinite()) right.coerceIn(-1f, 1f) else 0f
+        val gain = normalizer.nextGain(l, r)
+        val peak = max(abs(l), abs(r)) * gain
         val target = if (peak > 0.98f) 0.98f / peak else 1f
         guardGain = if (target < guardGain) target else guardGain + (target - guardGain) * releaseStep
         mix = if (enabled) (mix + mixStep).coerceAtMost(1f) else (mix - mixStep).coerceAtLeast(0f)
@@ -54,8 +56,8 @@ class SoundEngine {
     fun process(buf: FloatArray, frames: Int) {
         if (bypass) return
         for (n in 0 until frames) {
-            val l = buf[2 * n].takeIf { it.isFinite() } ?: 0f
-            val r = buf[2 * n + 1].takeIf { it.isFinite() } ?: 0f
+            val l = buf[2 * n].takeIf { it.isFinite() }?.coerceIn(-1f, 1f) ?: 0f
+            val r = buf[2 * n + 1].takeIf { it.isFinite() }?.coerceIn(-1f, 1f) ?: 0f
             val gain = nextGain(l, r)
             buf[2 * n] = l * gain
             buf[2 * n + 1] = r * gain
