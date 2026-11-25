@@ -54,4 +54,27 @@ class PcmNormalizerTest {
             while (out.hasRemaining()) assertTrue(out.float in -1f..1f)
         }
     }
+    @Test fun activeNormalizationIsIndependentOfBufferSplits() {
+        for (channels in 1..2) for (floating in listOf(false, true)) {
+            val frame = channels * if (floating) 4 else 2
+            val input = buffer(ByteArray(frame * 20))
+            repeat(channels * 20) { i ->
+                val value = if (i % 3 == 0) 0.85f else -0.23f
+                if (floating) input.putFloat(value) else input.putShort((value * 32768f).toInt().toShort())
+            }
+            val data = input.array()
+            fun render(split: Int): ByteArray {
+                val pcm = PcmNormalizer()
+                val settings = SoundSettings(true)
+                pcm.configure(48000, settings)
+                val out = buffer(ByteArray(data.size))
+                for (part in listOf(data.copyOfRange(0, split), data.copyOfRange(split, data.size)))
+                    pcm.process(buffer(part), out, channels, floating, settings)
+                assertEquals(data.size, out.position())
+                return out.array()
+            }
+            val reference = render(data.size)
+            for (split in 0..data.size) assertArrayEquals(reference, render(split))
+        }
+    }
 }
