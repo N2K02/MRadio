@@ -7,87 +7,39 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 
-/**
- * Sits in the player's audio path and runs every buffer through [SoundEngine] with the current
- * [SoundFx] settings. Mono stations are turned into stereo first, so the equalizer and the 3D
- * modes work on them too. Anything else (surround, non-PCM) passes through untouched.
- */
+/** Normalizes PCM without altering the source channel count or encoding. */
 @OptIn(UnstableApi::class)
 class SoundProcessor : BaseAudioProcessor() {
-    private val engine = SoundEngine()
-    private val plans = SoundPlanWorker()
-    private var scratch = FloatArray(0)
+    private val pcm = PcmNormalizer()
     private var lastStreamGeneration = SoundFx.streamGeneration
 
     override fun onConfigure(inputAudioFormat: AudioFormat): AudioFormat {
         val pcm = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT ||
             inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
         if (!pcm || inputAudioFormat.channelCount !in 1..2) return AudioFormat.NOT_SET
-        engine.configure(inputAudioFormat.sampleRate)
-        // Start neutral until the first complete, rate-matched plan is ready.
-        engine.applyPrepared(SoundSettings(enabled = false, normalizeVolume = false), 1f)
-        plans.request(SoundFx.settings.value, inputAudioFormat.sampleRate)
-        return AudioFormat(inputAudioFormat.sampleRate, 2, inputAudioFormat.encoding)
+        return inputAudioFormat
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
-        val size = inputBuffer.remaining()
-        if (size == 0) return
         val generation = SoundFx.streamGeneration
         if (generation != lastStreamGeneration) {
             lastStreamGeneration = generation
-            engine.resetNormalization()
+            pcm.reset()
         }
-        val settings = SoundFx.settings.value
-        plans.request(settings, inputAudioFormat.sampleRate)
-        val prepared = plans.ready
-        if (prepared != null && prepared.rate == inputAudioFormat.sampleRate && prepared.settings === settings) {
-            engine.applyPrepared(prepared.settings, prepared.gain)
-        }
-
-        val mono = inputAudioFormat.channelCount == 1
+        val channels = inputAudioFormat.channelCount
         val isFloat = inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
-        val bytes = if (isFloat) 4 else 2
-        val frames = size / (bytes * if (mono) 1 else 2)
-        val out = replaceOutputBuffer(frames * 2 * bytes)
-
-        if (engine.bypass && !mono) {
-            // Nothing to change: hand the audio on exactly as it came.
-            val end = inputBuffer.position() + frames * 2 * bytes
-            val keepLimit = inputBuffer.limit()
-            inputBuffer.limit(end)
-            out.put(inputBuffer)
-            inputBuffer.limit(keepLimit)
-        } else {
-            val samples = frames * 2
-            if (scratch.size < samples) scratch = FloatArray(samples)
-            for (n in 0 until frames) {
-                val l = readSample(inputBuffer, isFloat)
-                val r = if (mono) l else readSample(inputBuffer, isFloat)
-                scratch[2 * n] = l
-                scratch[2 * n + 1] = r
-            }
-            engine.process(scratch, frames) // does nothing when bypassed
-            for (i in 0 until samples) {
-                if (isFloat) {
-                    out.putFloat(scratch[i])
-                } else {
-                    out.putShort((scratch[i] * 32768f).toInt().coerceIn(-32768, 32767).toShort())
-                }
-            }
-        }
-        inputBuffer.position(inputBuffer.limit()) // a partial frame, if any, is dropped
+        val frameBytes = (if (isFloat) 4 else 2) * channels
+        val out = replaceOutputBuffer(pcm.outputSize(inputBuffer.remaining(), frameBytes))
+        pcm.process(inputBuffer, out, channels, isFloat, SoundFx.settings.value)
         out.flip()
     }
 
-    private fun readSample(b: ByteBuffer, isFloat: Boolean): Float {
-        val value = if (isFloat) b.getFloat() else b.getShort() / 32768f
-        return if (value.isFinite()) value else 0f
+    override fun onFlush() {
+        lastStreamGeneration = SoundFx.streamGeneration
+        if (inputAudioFormat.sampleRate > 0)
+            pcm.configure(inputAudioFormat.sampleRate, SoundFx.settings.value)
+        else pcm.reset()
     }
 
-    override fun onFlush() = engine.reset()
-
-    override fun onReset() {
-        scratch = FloatArray(0)
-    }
+    override fun onReset() = pcm.reset()
 }

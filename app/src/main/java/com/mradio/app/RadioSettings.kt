@@ -18,11 +18,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Alarm
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.AddCircleOutline
@@ -64,7 +64,6 @@ import dev.n2k02.updater.hasPendingUpdate
 @Composable
 internal fun RadioSettings(
     versionDescription: String,
-    onEqualizer: () -> Unit,
     onCheckUpdates: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -189,8 +188,8 @@ internal fun RadioSettings(
                             )
                             ListItem(
                                 headlineContent = { Text("Playback & audio") },
-                                supportingContent = { Text("Auto-play and equalizer") },
-                                leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
+                                supportingContent = { Text("Auto-play and volume normalization") },
+                                leadingContent = { Icon(Icons.Rounded.VolumeUp, null) },
                                 modifier = Modifier.clickable { onPageChange(SettingsDestination.PLAYBACK) },
                             )
                             ListItem(
@@ -258,12 +257,6 @@ internal fun RadioSettings(
                                 modifier = Modifier.clickable {
                                     SoundFx.update { it.copy(normalizeVolume = !it.normalizeVolume) }
                                 },
-                            )
-                            ListItem(
-                                headlineContent = { Text("Equalizer") },
-                                supportingContent = { Text("Adjust sound settings") },
-                                leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
-                                modifier = Modifier.clickable { onEqualizer() },
                             )
                         } else if (current == SettingsDestination.ALARM) {
                             // Only saved playable stations survive a cold start or device reboot.
