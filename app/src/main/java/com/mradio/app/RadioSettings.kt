@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.AddCircleOutline
@@ -188,7 +189,7 @@ internal fun RadioSettings(
                             ListItem(
                                 headlineContent = { Text("Playback & audio") },
                                 supportingContent = { Text("Auto-play and volume normalization") },
-                                leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
+                                leadingContent = { Icon(Icons.Rounded.VolumeUp, null) },
                                 modifier = Modifier.clickable { onPageChange(SettingsDestination.PLAYBACK) },
                             )
                             ListItem(
