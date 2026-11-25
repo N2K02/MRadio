@@ -66,7 +66,7 @@ internal class PcmNormalizer {
 
     private fun readSample(b: ByteBuffer, isFloat: Boolean): Float {
         val value = if (isFloat) b.getFloat() else b.getShort() / 32768f
-        return if (value.isFinite()) value else 0f
+        return if (value.isFinite()) value.coerceIn(-1f, 1f) else 0f
     }
 
     private fun writeSample(b: ByteBuffer, value: Float, isFloat: Boolean) {
