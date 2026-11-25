@@ -6,66 +6,69 @@ import androidx.media3.common.audio.AudioProcessor.AudioFormat
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
-/** Normalizes mono and stereo PCM station volume. */
+/** Normalizes PCM without altering the source channel count or encoding. */
 @OptIn(UnstableApi::class)
 class SoundProcessor : BaseAudioProcessor() {
     private val engine = SoundEngine()
-    private var scratch = FloatArray(0)
+    private val partial = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder())
     private var lastStreamGeneration = SoundFx.streamGeneration
 
     override fun onConfigure(inputAudioFormat: AudioFormat): AudioFormat {
         val pcm = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT ||
             inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
         if (!pcm || inputAudioFormat.channelCount !in 1..2) return AudioFormat.NOT_SET
-        engine.configure(inputAudioFormat.sampleRate)
-        engine.apply(SoundFx.settings.value)
-        return AudioFormat(inputAudioFormat.sampleRate, 2, inputAudioFormat.encoding)
+        return inputAudioFormat
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
-        val size = inputBuffer.remaining()
-        if (size == 0) return
         val generation = SoundFx.streamGeneration
         if (generation != lastStreamGeneration) {
             lastStreamGeneration = generation
             engine.resetNormalization()
+            partial.clear()
         }
         engine.apply(SoundFx.settings.value)
-
         val mono = inputAudioFormat.channelCount == 1
         val isFloat = inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
-        val bytes = if (isFloat) 4 else 2
-        val frames = size / (bytes * if (mono) 1 else 2)
-        val out = replaceOutputBuffer(frames * 2 * bytes)
-
-        if (engine.bypass && !mono) {
-            // Nothing to change: hand the audio on exactly as it came.
-            val end = inputBuffer.position() + frames * 2 * bytes
-            val keepLimit = inputBuffer.limit()
-            inputBuffer.limit(end)
-            out.put(inputBuffer)
-            inputBuffer.limit(keepLimit)
-        } else {
-            val samples = frames * 2
-            if (scratch.size < samples) scratch = FloatArray(samples)
-            for (n in 0 until frames) {
-                val l = readSample(inputBuffer, isFloat)
-                val r = if (mono) l else readSample(inputBuffer, isFloat)
-                scratch[2 * n] = l
-                scratch[2 * n + 1] = r
-            }
-            engine.process(scratch, frames) // does nothing when bypassed
-            for (i in 0 until samples) {
-                if (isFloat) {
-                    out.putFloat(scratch[i])
-                } else {
-                    out.putShort((scratch[i] * 32768f).toInt().coerceIn(-32768, 32767).toShort())
-                }
+        val frameBytes = (if (isFloat) 4 else 2) * inputAudioFormat.channelCount
+        val out = replaceOutputBuffer((partial.position() + inputBuffer.remaining()) / frameBytes * frameBytes)
+        if (partial.position() > 0) {
+            copyBytes(inputBuffer, partial, minOf(frameBytes - partial.position(), inputBuffer.remaining()))
+            if (partial.position() == frameBytes) {
+                partial.flip()
+                renderFrame(partial, out, mono, isFloat, frameBytes)
+                partial.clear()
             }
         }
-        inputBuffer.position(inputBuffer.limit()) // a partial frame, if any, is dropped
+        while (inputBuffer.remaining() >= frameBytes) {
+            if (engine.bypass) {
+                val count = inputBuffer.remaining() / frameBytes * frameBytes
+                copyBytes(inputBuffer, out, count)
+            } else renderFrame(inputBuffer, out, mono, isFloat, frameBytes)
+        }
+        copyBytes(inputBuffer, partial, inputBuffer.remaining())
         out.flip()
+    }
+
+    private fun copyBytes(source: ByteBuffer, target: ByteBuffer, count: Int) {
+        val limit = source.limit()
+        source.limit(source.position() + count)
+        target.put(source)
+        source.limit(limit)
+    }
+
+    private fun renderFrame(input: ByteBuffer, output: ByteBuffer, mono: Boolean, isFloat: Boolean, frameBytes: Int) {
+        if (engine.bypass) {
+            copyBytes(input, output, frameBytes)
+            return
+        }
+        val l = readSample(input, isFloat)
+        val r = if (mono) l else readSample(input, isFloat)
+        val gain = engine.nextGain(l, r)
+        writeSample(output, l * gain, isFloat)
+        if (!mono) writeSample(output, r * gain, isFloat)
     }
 
     private fun readSample(b: ByteBuffer, isFloat: Boolean): Float {
@@ -73,9 +76,19 @@ class SoundProcessor : BaseAudioProcessor() {
         return if (value.isFinite()) value else 0f
     }
 
-    override fun onFlush() = engine.reset()
+    private fun writeSample(b: ByteBuffer, value: Float, isFloat: Boolean) {
+        if (isFloat) b.putFloat(value)
+        else b.putShort((value * 32768f).toInt().coerceIn(-32768, 32767).toShort())
+    }
+
+    override fun onFlush() {
+        partial.clear()
+        if (inputAudioFormat.sampleRate > 0) engine.configure(inputAudioFormat.sampleRate)
+        engine.apply(SoundFx.settings.value)
+        engine.reset()
+    }
 
     override fun onReset() {
-        scratch = FloatArray(0)
+        partial.clear()
     }
 }
