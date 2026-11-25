@@ -233,14 +233,13 @@ fun MRadioScreen(
     var settingsMenu by remember { mutableStateOf(false) }
     var settingsPage by rememberSaveable { mutableStateOf(SettingsDestination.MAIN) }
     val updateState by LiveUpdater.controller.status.collectAsState()
-    var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(enabled = settingsMenu && settingsPage == SettingsDestination.MAIN) {
         settingsMenu = false
         homeTab = RadioDestination.HOME
     }
 
-    BackHandler(enabled = homeTab != RadioDestination.HOME && !settingsMenu && !playerOpen && !equalizerOpen && infoFor == null && !showHidden && !pickCountry && confirmHideStation == null) {
+    BackHandler(enabled = homeTab != RadioDestination.HOME && !settingsMenu && !playerOpen && infoFor == null && !showHidden && !pickCountry && confirmHideStation == null) {
         homeTab = RadioDestination.HOME
         query = ""
     }
@@ -595,10 +594,7 @@ fun MRadioScreen(
                 is dev.n2k02.updater.UpdateStatus.Current -> "Up to date"
                 else -> "Installed"
             },
-            onEqualizer = {
-                settingsMenu = false
-                equalizerOpen = true
-            },
+
             onCheckUpdates = {
                 LiveUpdater.controller.check(manual = true)
             },
@@ -883,7 +879,6 @@ fun MRadioScreen(
     }
 
 
-    if (equalizerOpen) EqualizerSheet(onDismiss = { equalizerOpen = false })
 
     if (pickCountry) {
         CountryPicker(
