@@ -88,4 +88,36 @@ class LoudnessNormalizerTest {
         assertTrue(engine.bypass)
         assertEquals(1f, engine.nextGain(0.5f, 0.5f), 0f)
     }
+    @Test fun newStreamRestartsWithoutInheritingOldGain() {
+        val engine = SoundEngine()
+        engine.configure(fs)
+        engine.apply(SoundSettings(true))
+        repeat(fs * 3) { engine.nextGain(0.6f, 0.6f) }
+        engine.resetNormalization()
+        assertEquals(1f, engine.nextGain(0.2f, 0.2f), 0.001f)
+    }
+
+    @Test fun invalidInputDoesNotPoisonGain() {
+        val engine = SoundEngine()
+        engine.configure(fs)
+        engine.apply(SoundSettings(true))
+        for (sample in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.MAX_VALUE, -Float.MAX_VALUE)) {
+            assertTrue(engine.nextGain(sample, sample).isFinite())
+        }
+        repeat(fs) { assertTrue(engine.nextGain(0.4f, 0.4f).isFinite()) }
+    }
+
+    @Test fun repeatedRateChangesAndTogglesRemainBounded() {
+        val engine = SoundEngine()
+        for (rate in listOf(44100, 48000, 48000, 96000)) {
+            engine.configure(rate)
+            repeat(8) { toggle ->
+                engine.apply(SoundSettings(toggle % 2 == 0))
+                repeat(rate / 100) {
+                    val gain = engine.nextGain(1f, -1f)
+                    assertTrue(gain in 0f..1.00001f)
+                }
+            }
+        }
+    }
 }
