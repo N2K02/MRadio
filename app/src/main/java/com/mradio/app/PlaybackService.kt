@@ -153,7 +153,7 @@ class PlaybackService : MediaLibraryService() {
         Library.init(this)
         SoundFx.init(this)
 
-        // The player's audio goes through SoundProcessor (equalizer and 3D modes).
+        // The player's audio goes through SoundProcessor (station volume normalization).
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(
                 context: Context,
