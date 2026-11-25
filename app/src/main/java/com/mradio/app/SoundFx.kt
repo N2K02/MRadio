@@ -23,7 +23,7 @@ object SoundFx {
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("mradio_sound", Context.MODE_PRIVATE)
-        val saved = prefs.getString("settings", null)
+        val saved = runCatching { prefs.getString("settings", null) }.getOrNull()
         _settings.value = SoundPreferenceCodec.decode(saved)
         if (saved != SoundPreferenceCodec.encode(_settings.value)) save()
     }
