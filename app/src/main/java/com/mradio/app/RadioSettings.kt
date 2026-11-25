@@ -64,7 +64,6 @@ import dev.n2k02.updater.hasPendingUpdate
 @Composable
 internal fun RadioSettings(
     versionDescription: String,
-    onEqualizer: () -> Unit,
     onCheckUpdates: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -189,7 +188,7 @@ internal fun RadioSettings(
                             )
                             ListItem(
                                 headlineContent = { Text("Playback & audio") },
-                                supportingContent = { Text("Auto-play and equalizer") },
+                                supportingContent = { Text("Auto-play and volume normalization") },
                                 leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
                                 modifier = Modifier.clickable { onPageChange(SettingsDestination.PLAYBACK) },
                             )
@@ -258,12 +257,6 @@ internal fun RadioSettings(
                                 modifier = Modifier.clickable {
                                     SoundFx.update { it.copy(normalizeVolume = !it.normalizeVolume) }
                                 },
-                            )
-                            ListItem(
-                                headlineContent = { Text("Equalizer") },
-                                supportingContent = { Text("Adjust sound settings") },
-                                leadingContent = { Icon(Icons.Rounded.GraphicEq, null) },
-                                modifier = Modifier.clickable { onEqualizer() },
                             )
                         } else if (current == SettingsDestination.ALARM) {
                             // Only saved playable stations survive a cold start or device reboot.
