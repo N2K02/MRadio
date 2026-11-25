@@ -6,7 +6,8 @@ import kotlin.math.max
 
 /** Linked station normalization with a smooth wet/dry transition. */
 class SoundEngine {
-    private var normalizer = LoudnessNormalizer(44100)
+    private var rate = 44100
+    private var normalizer = LoudnessNormalizer(rate)
     private var guardGain = 1f
     private var releaseStep = 0f
     private var mixStep = 1f / 2205f
@@ -15,7 +16,11 @@ class SoundEngine {
     val bypass: Boolean get() = !enabled && mix == 0f
 
     fun configure(sampleRate: Int) {
-        normalizer = LoudnessNormalizer(sampleRate)
+        require(sampleRate > 0)
+        if (rate != sampleRate) {
+            rate = sampleRate
+            normalizer = LoudnessNormalizer(rate)
+        }
         releaseStep = (1 - exp(-1.0 / (0.02 * sampleRate))).toFloat() * 0.25f
         mixStep = 1f / max(1f, sampleRate * 0.05f)
         reset()
@@ -27,7 +32,11 @@ class SoundEngine {
         mix = if (enabled) 1f else 0f
     }
 
-    fun resetNormalization() = reset()
+    fun resetNormalization() {
+        normalizer.reset()
+        guardGain = 1f
+        mix = 0f // introduce normalization smoothly on a new stream
+    }
 
     fun apply(settings: SoundSettings) {
         enabled = settings.normalizeVolume
@@ -36,8 +45,11 @@ class SoundEngine {
     /** Returns a linked gain, preserving the native channel count and stereo balance. */
     fun nextGain(left: Float, right: Float): Float {
         if (bypass) return 1f
-        val l = if (left.isFinite()) left.coerceIn(-1f, 1f) else 0f
-        val r = if (right.isFinite()) right.coerceIn(-1f, 1f) else 0f
+        return nextValidatedGain(sanitize(left), sanitize(right))
+    }
+
+    internal fun nextValidatedGain(l: Float, r: Float): Float {
+        if (bypass) return 1f
         val gain = normalizer.nextGain(l, r)
         val peak = max(abs(l), abs(r)) * gain
         val target = if (peak > 0.98f) 0.98f / peak else 1f
@@ -56,11 +68,15 @@ class SoundEngine {
     fun process(buf: FloatArray, frames: Int) {
         if (bypass) return
         for (n in 0 until frames) {
-            val l = buf[2 * n].takeIf { it.isFinite() }?.coerceIn(-1f, 1f) ?: 0f
-            val r = buf[2 * n + 1].takeIf { it.isFinite() }?.coerceIn(-1f, 1f) ?: 0f
-            val gain = nextGain(l, r)
+            if (bypass) break
+            val l = sanitize(buf[2 * n])
+            val r = sanitize(buf[2 * n + 1])
+            val gain = nextValidatedGain(l, r)
             buf[2 * n] = l * gain
             buf[2 * n + 1] = r * gain
         }
+    }
+    companion object {
+        internal fun sanitize(value: Float): Float = if (value.isFinite()) value.coerceIn(-1f, 1f) else 0f
     }
 }
