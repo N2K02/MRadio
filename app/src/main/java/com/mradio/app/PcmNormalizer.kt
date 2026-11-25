@@ -17,7 +17,7 @@ internal class PcmNormalizer {
 
     fun reset() {
         partial.clear()
-        engine.reset()
+        engine.resetNormalization()
     }
 
     fun outputSize(inputBytes: Int, frameBytes: Int): Int =
@@ -59,14 +59,13 @@ internal class PcmNormalizer {
         }
         val l = readSample(input, isFloat)
         val r = if (mono) l else readSample(input, isFloat)
-        val gain = engine.nextGain(l, r)
+        val gain = engine.nextValidatedGain(l, r)
         writeSample(output, l * gain, isFloat)
         if (!mono) writeSample(output, r * gain, isFloat)
     }
 
     private fun readSample(b: ByteBuffer, isFloat: Boolean): Float {
-        val value = if (isFloat) b.getFloat() else b.getShort() / 32768f
-        return if (value.isFinite()) value.coerceIn(-1f, 1f) else 0f
+        return if (isFloat) SoundEngine.sanitize(b.getFloat()) else b.getShort() / 32768f
     }
 
     private fun writeSample(b: ByteBuffer, value: Float, isFloat: Boolean) {
