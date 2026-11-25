@@ -7,15 +7,10 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 
-/**
- * Sits in the player's audio path and runs every buffer through [SoundEngine] with the current
- * [SoundFx] settings. Mono stations are turned into stereo first, so the equalizer and the 3D
- * modes work on them too. Anything else (surround, non-PCM) passes through untouched.
- */
+/** Normalizes mono and stereo PCM station volume. */
 @OptIn(UnstableApi::class)
 class SoundProcessor : BaseAudioProcessor() {
     private val engine = SoundEngine()
-    private val plans = SoundPlanWorker()
     private var scratch = FloatArray(0)
     private var lastStreamGeneration = SoundFx.streamGeneration
 
@@ -24,9 +19,7 @@ class SoundProcessor : BaseAudioProcessor() {
             inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
         if (!pcm || inputAudioFormat.channelCount !in 1..2) return AudioFormat.NOT_SET
         engine.configure(inputAudioFormat.sampleRate)
-        // Start neutral until the first complete, rate-matched plan is ready.
-        engine.applyPrepared(SoundSettings(enabled = false, normalizeVolume = false), 1f)
-        plans.request(SoundFx.settings.value, inputAudioFormat.sampleRate)
+        engine.apply(SoundFx.settings.value)
         return AudioFormat(inputAudioFormat.sampleRate, 2, inputAudioFormat.encoding)
     }
 
@@ -38,12 +31,7 @@ class SoundProcessor : BaseAudioProcessor() {
             lastStreamGeneration = generation
             engine.resetNormalization()
         }
-        val settings = SoundFx.settings.value
-        plans.request(settings, inputAudioFormat.sampleRate)
-        val prepared = plans.ready
-        if (prepared != null && prepared.rate == inputAudioFormat.sampleRate && prepared.settings === settings) {
-            engine.applyPrepared(prepared.settings, prepared.gain)
-        }
+        engine.apply(SoundFx.settings.value)
 
         val mono = inputAudioFormat.channelCount == 1
         val isFloat = inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT
