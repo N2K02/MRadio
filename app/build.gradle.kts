@@ -76,6 +76,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303") // real JSON implementation for JVM migration tests
 
     // Station logos (memory + disk cache)
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
